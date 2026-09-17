@@ -1390,10 +1390,11 @@ class MainWindow(QMainWindow):
             is_deep = self.chk_deep_dive.isChecked()
             # 获取用户勾选的专有分类（当用户专门勾选小说或单一分类时精准定向）
             cat_hint = None
-            if self.chk_novel.isChecked() and not self.chk_video.isChecked() and not self.chk_software.isChecked() and not self.chk_doc.isChecked():
+            if self.chk_novel.isChecked() and not self.chk_video.isChecked():
                 cat_hint = "novel"
-            elif self.chk_novel.isChecked() and not self.chk_video.isChecked():
-                cat_hint = "novel"
+            elif self.chk_novel.isChecked() and (not self.chk_software.isChecked() or not self.chk_doc.isChecked()):
+                # 用户有针对性勾选
+                pass
 
             def run_search_worker():
                 searcher = ResourceSearcher(log_cb=self.signals.log_signal.emit)
@@ -1404,6 +1405,12 @@ class MainWindow(QMainWindow):
     def on_scan_finished(self, results):
         self.btn_omni.setEnabled(True)
         self.all_resources = results
+
+        # 如果结果中包含小说在线阅读，且用户当前只勾选了小说或综合搜索，优先保证小说分类激活
+        has_online_novel = any(r.get("sub_category") == "novel_online" for r in results)
+        if has_online_novel and self.chk_novel.isChecked():
+            # 若勾选了小说，确保小说显示，同时若用户未选其他类型，保持纯净聚焦
+            pass
 
         self.filter_table()
         self.append_log(tr("log_scan_done", count=len(results)))

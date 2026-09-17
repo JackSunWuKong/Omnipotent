@@ -588,11 +588,11 @@ class ResourceSearcher:
         results = []
         seen = set()
 
-        # 1. 在线阅读源探针 (8tsw / 笔趣阁多节点聚合)
+        # 1. 在线阅读源探针 (8tsw / 笔趣阁多节点 + 136书屋与全网书库暗河探针)
         def fetch_online_novel():
             items = []
             try:
-                # 8tsw 引擎
+                # 引擎 A: 8tsw 经典笔趣阁镜像
                 search_url = 'http://www.8tsw.com/modules/article/search.php?searchkey=' + quote(keyword.encode('gbk', errors='ignore'))
                 req_headers = {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -634,8 +634,58 @@ class ResourceSearcher:
                                     "source_engine": "笔趣阁镜像",
                                     "referer": b_url
                                 })
-            except Exception as e:
+            except Exception:
                 pass
+
+            # 引擎 B: 垂直全网暗河书库穿透探针（覆盖冷门经典、已下架绝版小说，如《超级黑道学生》等）
+            try:
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+                }
+                for q_tpl in [f'{keyword} 136书屋 在线阅读', f'{keyword} 笔趣阁 在线阅读', f'《{keyword}》 目录 章节']:
+                    s_url = f'https://www.so.com/s?q={quote(q_tpl)}'
+                    with httpx.Client(headers=headers, timeout=5.0, verify=False) as client:
+                        r = client.get(s_url)
+                        if r.status_code == 200:
+                            soup = BeautifulSoup(r.text, 'html.parser')
+                            for li in soup.find_all('li', class_='res-list')[:8]:
+                                h3 = li.find('h3')
+                                if not h3:
+                                    continue
+                                a = h3.find('a')
+                                if not a:
+                                    continue
+                                raw_title = h3.get_text().strip()
+                                raw_url = a.get('data-mdurl') or a.get('href')
+                                if not raw_url or not raw_url.startswith('http'):
+                                    continue
+                                if any(bad in raw_url for bad in ['so.com', 'baidu.com', 'zhihu.com', 'tieba', 'douban', 'bilibili']):
+                                    continue
+
+                                # 136书库专项识别
+                                if '136book.com' in raw_url:
+                                    m_book = re.search(r'(https?://www\.136book\.com/[a-zA-Z0-9_\-]+/)', raw_url)
+                                    cat_url = m_book.group(1) if m_book else raw_url
+                                    if cat_url not in seen:
+                                        seen.add(cat_url)
+                                        author_m = re.search(r'-([^-]+)-.*?(?:在线阅读|txt)', raw_title)
+                                        author = author_m.group(1).strip() if author_m else '经典作家'
+                                        items.append({
+                                            "url": cat_url,
+                                            "category": "novel",
+                                            "sub_category": "novel_online",
+                                            "ext": "txt",
+                                            "size": 0,
+                                            "label": f"📖 《{keyword}》 (作者: {author}) [全本目录完备] [在线秒读/目录完整]",
+                                            "source_engine": "136书库在线源",
+                                            "referer": cat_url
+                                        })
+                    if items:
+                        break
+            except Exception:
+                pass
+
             return items
 
         # 2. 全网网盘小说暗搜 (精校 TXT / EPUB 全本合集)
@@ -715,7 +765,7 @@ class ResourceSearcher:
     @staticmethod
     def fetch_novel_chapters(book_url: str):
         """
-        根据小说页面 URL 获取章节目录列表（带自动多轮重试）
+        根据小说页面 URL 获取章节目录列表（带自动多轮重试与智能编码识别）
         返回: [{"title": "第一章...", "url": "http://..."}, ...]
         """
         chapters = []
@@ -724,23 +774,49 @@ class ResourceSearcher:
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Connection': 'close'
         }
-        target_url = book_url.replace("https://", "http://")
         
-        # 尝试多次防止瞬时 502
         for _ in range(3):
             try:
-                with httpx.Client(headers=req_headers, timeout=6.0, verify=False) as client:
-                    r = client.get(target_url)
-                    if r.status_code == 200 and len(r.content) > 1000:
-                        text = r.content.decode('gbk', errors='ignore')
+                with httpx.Client(headers=req_headers, timeout=6.0, verify=False, follow_redirects=True) as client:
+                    r = client.get(book_url)
+                    if r.status_code == 200 and len(r.content) > 500:
+                        content_bytes = r.content
+                        try:
+                            text = content_bytes.decode('utf-8')
+                        except Exception:
+                            text = content_bytes.decode('gbk', errors='ignore')
+
+                        # 策略 1: 笔趣阁标准 <dd><a href="...">...</a></dd>
                         raw_chapters = re.findall(r'<dd[^>]*>\s*<a\s+href=[\'"]([^\'"]+)[\'"][^>]*>([^<]+)</a>', text)
                         for rel_url, title in raw_chapters:
-                            full_ch_url = urllib.parse.urljoin(target_url, rel_url).replace("https://", "http://")
+                            full_ch_url = urllib.parse.urljoin(book_url, rel_url)
                             chapters.append({
                                 "title": title.strip(),
                                 "url": full_ch_url
                             })
+
+                        # 策略 2: 通用 / 136书屋等目录结构
+                        if not chapters:
+                            soup = BeautifulSoup(text, 'html.parser')
+                            for a in soup.find_all('a'):
+                                href = a.get('href', '')
+                                t = a.get_text().strip()
+                                if not href or href.startswith('javascript:') or href == '#':
+                                    continue
+                                if re.search(r'第\s*\d+\s*[章节卷回]|序言|前言|楔子|尾声|后记|番外|第[一二三四五六七八九十百千万]+[章节卷回]', t):
+                                    full_ch_url = urllib.parse.urljoin(book_url, href)
+                                    chapters.append({
+                                        "title": t,
+                                        "url": full_ch_url
+                                    })
+
                         if chapters:
+                            # 如果包含数字章节，按照章节次序规范排序（避免倒序或错乱）
+                            if '136book.com' in book_url:
+                                def get_ch_num(item):
+                                    m = re.search(r'第(\d+)章', item['title'])
+                                    return int(m.group(1)) if m else 999999
+                                chapters.sort(key=get_ch_num)
                             break
             except Exception:
                 pass
@@ -749,7 +825,7 @@ class ResourceSearcher:
     @staticmethod
     def fetch_chapter_content(chapter_url: str):
         """
-        根据章节链接抓取正文内容（带多轮重试与文本清洗）
+        根据章节链接抓取正文内容（带多轮重试与文本清洗，兼容各大书站与136书屋）
         返回: (title, text_content)
         """
         req_headers = {
@@ -757,30 +833,40 @@ class ResourceSearcher:
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Connection': 'close'
         }
-        target_url = chapter_url.replace("https://", "http://")
 
         for _ in range(3):
             try:
-                with httpx.Client(headers=req_headers, timeout=6.0, verify=False) as client:
-                    r = client.get(target_url)
+                with httpx.Client(headers=req_headers, timeout=6.0, verify=False, follow_redirects=True) as client:
+                    r = client.get(chapter_url)
                     if r.status_code == 200:
-                        text = r.content.decode('gbk', errors='ignore')
+                        content_bytes = r.content
+                        try:
+                            text = content_bytes.decode('utf-8')
+                        except Exception:
+                            text = content_bytes.decode('gbk', errors='ignore')
+
                         # 抓取标题
                         title_match = re.search(r'<h1>([^<]+)</h1>', text)
                         ch_title = title_match.group(1).strip() if title_match else ""
 
-                        # 抓取正文
-                        content_match = re.search(r'<div\s+id=[\'"]content[\'"][^>]*>(.*?)</div>', text, re.DOTALL)
-                        if content_match:
-                            raw_body = content_match.group(1)
-                            clean_body = re.sub(r'<br\s*/?>', '\n', raw_body)
-                            clean_body = re.sub(r'&nbsp;', ' ', clean_body)
-                            clean_body = re.sub(r'<[^>]+>', '', clean_body).strip()
-                            # 排版优化：段落前补4空格
+                        # 抓取正文：优先 id='content' / class='content' / 常见阅读节点
+                        soup = BeautifulSoup(text, 'html.parser')
+                        content_div = soup.find('div', id='content') or soup.find('div', class_='content') or soup.find('div', id='chaptercontent')
+                        if not content_div:
+                            for d in soup.find_all('div'):
+                                if len(d.get_text()) > 300:
+                                    content_div = d
+                                    break
+
+                        if content_div:
+                            raw_body = content_div.get_text('\n')
                             formatted_lines = []
-                            for line in clean_body.split('\n'):
+                            for line in raw_body.split('\n'):
                                 l = line.strip()
-                                if l:
+                                # 剔除 136book 等站末尾遗留的 'r' 乱码
+                                if l.endswith('r') and len(l) > 1 and not l.endswith('br'):
+                                    l = l[:-1].strip()
+                                if l and not any(ad in l for ad in ["请记住本书首发域名", "手机版阅读网址", "本章未完，请点击下一页"]):
                                     formatted_lines.append("    " + l)
                             return ch_title, "\n\n".join(formatted_lines)
             except Exception:

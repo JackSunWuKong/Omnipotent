@@ -29,8 +29,10 @@
 
 | 功能模块 | 技术实现 | 核心价值 |
 | :--- | :--- | :--- |
-| **🔍 智能全息识别** | 自动判别 URL 直链 / 影视剧名 / P2P 协议 | 零学习成本，输入即解析 |
-| **🎬 影视流媒体秒播** | 接入 10 大开放核心节点，集成 DPlayer 硬件加速解码 | 在线秒开出画，免看广告与假下载 |
+| **🔍 智能全息识别** | 自动判别 URL 直链 / 影视剧名 / 电子小说 / P2P 协议 | 零学习成本，输入即解析 |
+| **📖 原生小说阅读器** | 专研 `NovelReaderDialog` 架构，内嵌目次抽屉、字号调节、4大护眼主题与TXT全本导出 | 沉浸式小说阅读体验，媲美专业阅读应用 |
+| **📚 绝版书籍全网穿透** | 在线小说目录抓取 + 夸克/百度网盘无删减精校 TXT/EPUB 挖掘 | 轻松搜得全网罕见、完本与冷门小说资源 |
+| **🎬 影视流媒体秒播** | 接入 10 大开放核心节点，集成原生硬件加速硬解 | 在线秒开出画，免看广告与假下载 |
 | **🌊 全网深潜挖掘模式** | 剧情线索/短视频文案逆向溯源 + 网盘暗搜 + 全球 DHT 磁力 | 解决“看片段找不到原片”与绝版资源搜寻难题 |
 | **🌐 跨语言智能对齐** | 毫秒级多语言片名别名映射（如 Oppenheimer $\rightarrow$ 奥本海默） | 中英文双向互通秒出片源 |
 | **📄 附件与软件纯净直通**| DOM 树二级穿透，校验 `Content-Disposition` 二进制流 | 过滤流氓捆绑下载器，直达真实原件 |
@@ -116,7 +118,9 @@ python3 main_ui.py
 
 ## ✨ Key Features
 
-- **🔍 Smart Auto-Routing**: Automatically identifies direct URLs, media titles, or P2P/magnet protocols with zero learning curve.
+- **🔍 Smart Auto-Routing**: Automatically identifies direct URLs, media titles, novels, or P2P/magnet protocols with zero learning curve.
+- **📖 Native Novel & E-Book Reader**: Integrated `NovelReaderDialog` featuring TOC navigation, 4 eye-care themes, font scaling, and full-book TXT exporting.
+- **📚 Deep Book Search Matrix**: Retrieves complete TOCs from open chapter aggregators + uncompressed TXT/EPUB collections from cloud drives.
 - **🎬 Hardware Accelerated Streaming**: Connects to 10 verified high-speed nodes for instant playback via an embedded player.
 - **🌊 Deep Dive Mode**: Includes plot/clue reverse search, cloud drive index traversal, and global decentralized DHT magnet discovery.
 - **🌐 Cross-Lingual Title Mapping**: Real-time translation of foreign titles to canonical counterparts (e.g. *Oppenheimer* $\rightarrow$ *奥本海默*).

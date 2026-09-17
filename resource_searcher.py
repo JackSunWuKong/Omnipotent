@@ -5,6 +5,7 @@
 
 import re
 import httpx
+import urllib.parse
 import concurrent.futures
 from urllib.parse import quote
 from bs4 import BeautifulSoup
@@ -577,13 +578,209 @@ class ResourceSearcher:
         self.log_cb(f"🌊 【全网深潜完毕】共挖掘出 {len(all_results)} 个全维可用资源（含可播视频流、网盘转存、全球磁力）！")
         return all_results
 
+    def search_novels(self, keyword: str):
+        """
+        全网小说与绝版书籍深度探针矩阵：
+        1. 在线阅读源：直连各大开放小说目录索引，提取作品名、作者、最新章节，支持直接调起专属阅读器
+        2. 全网网盘小说暗搜：穿透夸克/百度网盘搜索未删减全本 TXT/EPUB 精校资源
+        """
+        self.log_cb(f"正在全网小说库与网盘暗河中深度探索: 《{keyword}》...")
+        results = []
+        seen = set()
+
+        # 1. 在线阅读源探针 (8tsw / 笔趣阁多节点聚合)
+        def fetch_online_novel():
+            items = []
+            try:
+                # 8tsw 引擎
+                search_url = 'http://www.8tsw.com/modules/article/search.php?searchkey=' + quote(keyword.encode('gbk', errors='ignore'))
+                req_headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Connection': 'close'
+                }
+                with httpx.Client(headers=req_headers, timeout=6.0, verify=False) as client:
+                    r = client.get(search_url)
+                    if r.status_code == 200:
+                        content_text = r.content.decode('gbk', errors='ignore')
+                        # 匹配每行记录
+                        for m in re.finditer(r'<tr id=["\']nr["\']>(.*?)</tr>', content_text, re.DOTALL):
+                            row = m.group(1)
+                            # 提取书籍链接与书名
+                            b_match = re.search(r'<a\s+href=["\']([^"\']+)["\'][^>]*>([^<]+)</a>', row)
+                            if not b_match:
+                                continue
+                            b_url = b_match.group(1)
+                            b_title = b_match.group(2).strip()
+                            if not b_url.startswith('http'):
+                                b_url = 'http://www.8tsw.com' + b_url
+
+                            # 提取最新章节
+                            ch_matches = re.findall(r'<a\s+href=["\']([^"\']+)["\'][^>]*>([^<]+)</a>', row)
+                            latest_ch = ch_matches[1][1].strip() if len(ch_matches) > 1 else "全本连载"
+
+                            # 提取作者
+                            tds = re.findall(r'<td[^>]*>(.*?)</td>', row, re.DOTALL)
+                            author = re.sub(r'<[^>]+>', '', tds[2]).strip() if len(tds) > 2 else "未知作者"
+
+                            if b_url not in seen:
+                                seen.add(b_url)
+                                items.append({
+                                    "url": b_url,
+                                    "category": "novel",
+                                    "sub_category": "novel_online",
+                                    "ext": "txt",
+                                    "size": 0,
+                                    "label": f"📖 《{b_title}》 (作者: {author}) [最新: {latest_ch[:20]}] [在线秒读/目录完整]",
+                                    "source_engine": "笔趣阁镜像",
+                                    "referer": b_url
+                                })
+            except Exception as e:
+                pass
+            return items
+
+        # 2. 全网网盘小说暗搜 (精校 TXT / EPUB 全本合集)
+        def fetch_pan_novel():
+            items = []
+            pan_configs = [
+                {"platform": "夸克网盘", "domain": "pan.quark.cn"},
+                {"platform": "百度网盘", "domain": "pan.baidu.com"},
+            ]
+            for p_conf in pan_configs:
+                plat = p_conf["platform"]
+                dom = p_conf["domain"]
+                try:
+                    q_str = f"{keyword} (txt OR epub) {dom}"
+                    url = f"https://www.so.com/s?q={quote(q_str)}"
+                    with httpx.Client(headers=self.headers, timeout=5.0, verify=False) as client:
+                        r = client.get(url)
+                        if r.status_code == 200:
+                            soup = BeautifulSoup(r.text, "html.parser")
+                            for li in soup.find_all("li", class_="res-list")[:8]:
+                                t_text = li.get_text()
+                                h3 = li.find("h3")
+                                title_text = h3.get_text().strip() if h3 else keyword
+                                title_clean = " ".join(title_text.split())
+
+                                if dom == "pan.quark.cn":
+                                    links = re.findall(r'https?://pan\.quark\.cn/s/[a-zA-Z0-9]+', t_text)
+                                else:
+                                    links = re.findall(r'https?://pan\.baidu\.com/s/[a-zA-Z0-9_\-]+', t_text)
+
+                                pwd_match = re.search(r'(?:提取码|密码|pwd)[:：\s]*([a-zA-Z0-9]{4})', t_text, re.IGNORECASE)
+                                pwd = pwd_match.group(1) if pwd_match else ""
+
+                                for lk in links:
+                                    if lk not in seen:
+                                        seen.add(lk)
+                                        pwd_str = f"?pwd={pwd}" if pwd and "pwd=" not in lk else ""
+                                        full_pan_url = lk + pwd_str if pwd_str else lk
+                                        items.append({
+                                            "url": full_pan_url,
+                                            "category": "novel",
+                                            "sub_category": "novel_pan",
+                                            "ext": "txt",
+                                            "size": 0,
+                                            "label": f"☁️ 《{title_clean[:45]}》 [{plat}全本TXT/EPUB] {f'(提取码: {pwd})' if pwd else '(免密直存)'}",
+                                            "source_engine": plat,
+                                            "pwd": pwd,
+                                            "referer": ""
+                                        })
+                except Exception:
+                    pass
+            return items
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            f_online = executor.submit(fetch_online_novel)
+            f_pan = executor.submit(fetch_pan_novel)
+            results.extend(f_online.result())
+            results.extend(f_pan.result())
+
+        self.log_cb(f"小说资源深度探索完毕！共捕获到 {len(results)} 部书籍（含在线阅读与网盘精校全本）。")
+        return results
+
+    @staticmethod
+    def fetch_novel_chapters(book_url: str):
+        """
+        根据小说页面 URL 获取章节目录列表（带自动多轮重试）
+        返回: [{"title": "第一章...", "url": "http://..."}, ...]
+        """
+        chapters = []
+        req_headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Connection': 'close'
+        }
+        target_url = book_url.replace("https://", "http://")
+        
+        # 尝试多次防止瞬时 502
+        for _ in range(3):
+            try:
+                with httpx.Client(headers=req_headers, timeout=6.0, verify=False) as client:
+                    r = client.get(target_url)
+                    if r.status_code == 200 and len(r.content) > 1000:
+                        text = r.content.decode('gbk', errors='ignore')
+                        raw_chapters = re.findall(r'<dd[^>]*>\s*<a\s+href=[\'"]([^\'"]+)[\'"][^>]*>([^<]+)</a>', text)
+                        for rel_url, title in raw_chapters:
+                            full_ch_url = urllib.parse.urljoin(target_url, rel_url).replace("https://", "http://")
+                            chapters.append({
+                                "title": title.strip(),
+                                "url": full_ch_url
+                            })
+                        if chapters:
+                            break
+            except Exception:
+                pass
+        return chapters
+
+    @staticmethod
+    def fetch_chapter_content(chapter_url: str):
+        """
+        根据章节链接抓取正文内容（带多轮重试与文本清洗）
+        返回: (title, text_content)
+        """
+        req_headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Connection': 'close'
+        }
+        target_url = chapter_url.replace("https://", "http://")
+
+        for _ in range(3):
+            try:
+                with httpx.Client(headers=req_headers, timeout=6.0, verify=False) as client:
+                    r = client.get(target_url)
+                    if r.status_code == 200:
+                        text = r.content.decode('gbk', errors='ignore')
+                        # 抓取标题
+                        title_match = re.search(r'<h1>([^<]+)</h1>', text)
+                        ch_title = title_match.group(1).strip() if title_match else ""
+
+                        # 抓取正文
+                        content_match = re.search(r'<div\s+id=[\'"]content[\'"][^>]*>(.*?)</div>', text, re.DOTALL)
+                        if content_match:
+                            raw_body = content_match.group(1)
+                            clean_body = re.sub(r'<br\s*/?>', '\n', raw_body)
+                            clean_body = re.sub(r'&nbsp;', ' ', clean_body)
+                            clean_body = re.sub(r'<[^>]+>', '', clean_body).strip()
+                            # 排版优化：段落前补4空格
+                            formatted_lines = []
+                            for line in clean_body.split('\n'):
+                                l = line.strip()
+                                if l:
+                                    formatted_lines.append("    " + l)
+                            return ch_title, "\n\n".join(formatted_lines)
+            except Exception:
+                pass
+        return "", "正文加载失败，请检查网络或点击重新加载。"
+
     def search_all(self, keyword: str, deep_dive: bool = False):
         """
         全能全景搜索：智能识别关键词意图，全方位覆盖：
-        1. 影视/电视剧/动漫/音乐（10 大核心节点）
-        2. 全网深潜挖掘（夸克/百度网盘暗搜 + 全球 DHT 磁力网络）
-        3. 办公文档/简历/合同/PPT/Word/Excel
-        4. 各行业桌面与移动软件/安装包/绿色工具
+        1. 电子小说 / 全本书籍 / 在线阅读 / 章节目录
+        2. 影视 / 电视剧 / 动漫 / 音乐（10 大核心节点）
+        3. 全网深潜挖掘（夸克/百度网盘暗搜 + 全球 DHT 磁力网络）
+        4. 办公文档 / 简历 / 合同 / PPT / Word / Excel
+        5. 各行业桌面与移动软件 / 安装包 / 绿色工具
         """
         if deep_dive:
             return self.search_deep_dive(keyword)
@@ -593,15 +790,25 @@ class ResourceSearcher:
         if any(ci in keyword for ci in clue_indicators):
             return self.search_deep_dive(keyword)
 
+        novel_keywords = ["小说", "txt", "epub", "全本", "完本", "章节", "精校", "番外", "无删减", "书", "阅读", "文学"]
         doc_keywords = ["简历", "模板", "文档", "表格", "ppt", "word", "excel", "pdf", "论文", "合同", "素材", "图标"]
         software_keywords = ["软件", "下载", "安装包", "破解", "绿色版", "app", "pc", "mac", "windows", "client", "exe", "dmg", "apk", "player", "vscode", "potplayer", "微信", "qq", "chrome", "浏览器", "工具"]
 
         kw_lower = keyword.lower()
+        is_novel_intent = any(k in kw_lower for k in novel_keywords)
         is_doc_intent = any(k in kw_lower for k in doc_keywords)
         is_software_intent = any(k in kw_lower for k in software_keywords)
 
         results = []
-        if is_doc_intent:
+        if is_novel_intent:
+            self.log_cb(f"【OmniFinder】检测到小说/书籍意图，优先检索全网小说与TXT/EPUB精校资源池...")
+            # 去除冗余后缀词提高命中率
+            clean_book_name = re.sub(r'(?:小说|txt|epub|全本|完本|精校|无删减|下载)', '', keyword, flags=re.IGNORECASE).strip()
+            book_query = clean_book_name if clean_book_name else keyword
+            results.extend(self.search_novels(book_query))
+            # 附带检索网盘与影视
+            results.extend(self.search_pan_drives(keyword))
+        elif is_doc_intent:
             self.log_cb(f"【OmniFinder】检测到办公/文档/素材意图，优先检索全国模板库与文档资源...")
             results.extend(self.search_documents(keyword))
             video_results = self.search_videos(keyword)
@@ -615,16 +822,18 @@ class ResourceSearcher:
             # 综合意图：优先搜索影视矩阵
             video_results = self.search_videos(keyword)
             results.extend(video_results)
-            # 若常规源搜索结果较少，自动深潜补充网盘与磁力资源！
+            # 若常规源搜索结果较少，自动深潜补充小说、网盘与磁力资源！
             if len(results) < 3:
                 self.log_cb(f"【智能深潜补充】常规片源较少，自动调动网盘暗搜与全球磁力补强...")
                 results.extend(self.search_pan_drives(keyword))
                 results.extend(self.search_magnets(keyword))
+                results.extend(self.search_novels(keyword))
             if len(results) < 5:
                 results.extend(self.search_software(keyword))
                 results.extend(self.search_documents(keyword))
 
         return results
+
 
 
 

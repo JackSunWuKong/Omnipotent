@@ -23,7 +23,8 @@ from PyQt5.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QCheckBox, QTableWidget,
     QTableWidgetItem, QHeaderView, QFileDialog, QTextEdit, QPlainTextEdit,
     QProgressBar, QSplitter, QGroupBox, QMessageBox, QDialog,
-    QTabWidget, QSlider, QStyle, QScrollArea, QStackedWidget, QComboBox
+    QTabWidget, QSlider, QStyle, QScrollArea, QStackedWidget, QComboBox,
+    QListWidget, QListWidgetItem, QTextBrowser
 )
 
 from PyQt5.QtWebEngineWidgets import QWebEngineView
@@ -674,6 +675,367 @@ class ResourcePreviewDialog(QDialog):
         self.close()
 
 
+class NovelReaderDialog(QDialog):
+    """
+    专用小说原生极速阅读视口（集章节目录、排版字体调节、护眼主题、全本导出于一体）
+    具备现代电子书软件的标准体验：
+    1. 章节目录侧边抽屉，实时快速检索与无缝跳转
+    2. 四大经典阅读主题（护眼绿、典雅羊皮纸、夜间暗黑、简约纯白）
+    3. 自由字号缩放 (A- / A+) 与排版优化
+    4. 上一章 / 下一章平滑切章与进度百分比
+    5. 一键导出整本小说至本地纯文本 (.txt)
+    """
+    chapter_loaded_signal = pyqtSignal(str, str) # title, content
+    chapters_ready_signal = pyqtSignal(list)      # chapter list
+
+    THEMES = {
+        "green": {
+            "name_key": "reader_theme_green",
+            "bg": "#CCE8CF",
+            "text": "#1B3B22",
+            "sidebar_bg": "#BBDDBE",
+            "sidebar_text": "#1B3B22",
+            "border": "#A4CBA8"
+        },
+        "parchment": {
+            "name_key": "reader_theme_parchment",
+            "bg": "#F5EEDC",
+            "text": "#3D2B1F",
+            "sidebar_bg": "#ECE2CD",
+            "sidebar_text": "#3D2B1F",
+            "border": "#D8CAB0"
+        },
+        "dark": {
+            "name_key": "reader_theme_dark",
+            "bg": "#1E1E1E",
+            "text": "#D4D4D4",
+            "sidebar_bg": "#252526",
+            "sidebar_text": "#CCCCCC",
+            "border": "#3E3E42"
+        },
+        "white": {
+            "name_key": "reader_theme_white",
+            "bg": "#FFFFFF",
+            "text": "#24292E",
+            "sidebar_bg": "#F6F8FA",
+            "sidebar_text": "#24292E",
+            "border": "#E1E4E8"
+        }
+    }
+
+    def __init__(self, book_info: dict, parent=None):
+        super().__init__(parent)
+        self.book_info = book_info
+        self.book_url = book_info.get("url", "")
+        self.book_title = book_info.get("label", "小说阅读").split("]")[0].replace("📖 《", "").replace("》", "").strip()
+        if "《" in self.book_title and "》" in self.book_title:
+            self.book_title = self.book_title[self.book_title.find("《")+1:self.book_title.find("》")]
+
+        self.setWindowTitle(tr("reader_title", title=self.book_title))
+        self.resize(1080, 720)
+        self.current_theme = "green"
+        self.font_size = 18
+        self.all_chapters = []
+        self.current_chapter_idx = 0
+
+        self.chapter_loaded_signal.connect(self._on_chapter_loaded)
+        self.chapters_ready_signal.connect(self._on_chapters_ready)
+
+        self._init_ui()
+        self._apply_theme()
+        self._fetch_toc_async()
+
+    def _init_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # 1. 顶部控制工具栏
+        self.top_bar = QWidget()
+        top_layout = QHBoxLayout(self.top_bar)
+        top_layout.setContentsMargins(16, 10, 16, 10)
+        top_layout.setSpacing(12)
+
+        self.title_lbl = QLabel(f"📖 <b>《{self.book_title}》</b>")
+        self.title_lbl.setStyleSheet("font-size: 15px; font-weight: bold;")
+        top_layout.addWidget(self.title_lbl)
+
+        top_layout.addStretch()
+
+        # 字号缩放
+        btn_smaller = QPushButton(tr("reader_font_smaller"))
+        btn_smaller.setCursor(Qt.PointingHandCursor)
+        btn_smaller.clicked.connect(self._decrease_font)
+        top_layout.addWidget(btn_smaller)
+
+        btn_larger = QPushButton(tr("reader_font_larger"))
+        btn_larger.setCursor(Qt.PointingHandCursor)
+        btn_larger.clicked.connect(self._increase_font)
+        top_layout.addWidget(btn_larger)
+
+        # 主题切换按钮组
+        for theme_key in ["green", "parchment", "dark", "white"]:
+            btn_t = QPushButton(tr(self.THEMES[theme_key]["name_key"]))
+            btn_t.setCursor(Qt.PointingHandCursor)
+            btn_t.clicked.connect(lambda chk, tk=theme_key: self._set_theme(tk))
+            top_layout.addWidget(btn_t)
+
+        # 导出全本 TXT
+        self.btn_export = QPushButton(tr("reader_export_txt"))
+        self.btn_export.setStyleSheet("background-color: #00897B; color: white; font-weight: bold; border-radius: 4px; padding: 5px 12px;")
+        self.btn_export.setCursor(Qt.PointingHandCursor)
+        self.btn_export.clicked.connect(self._export_full_txt)
+        top_layout.addWidget(self.btn_export)
+
+        main_layout.addWidget(self.top_bar)
+
+        # 2. 中间主体（左目录 + 右阅读正文）
+        self.splitter = QSplitter(Qt.Horizontal)
+
+        # 左侧目录抽屉
+        self.toc_container = QWidget()
+        toc_layout = QVBoxLayout(self.toc_container)
+        toc_layout.setContentsMargins(10, 10, 10, 10)
+        toc_layout.setSpacing(8)
+
+        self.toc_header = QLabel(tr("reader_toc"))
+        self.toc_header.setStyleSheet("font-weight: bold; font-size: 14px;")
+        toc_layout.addWidget(self.toc_header)
+
+        self.toc_filter = QLineEdit()
+        self.toc_filter.setPlaceholderText(tr("reader_toc_search"))
+        self.toc_filter.textChanged.connect(self._filter_toc)
+        toc_layout.addWidget(self.toc_filter)
+
+        self.toc_list = QListWidget()
+        self.toc_list.itemClicked.connect(self._on_toc_clicked)
+        toc_layout.addWidget(self.toc_list, 1)
+
+        self.splitter.addWidget(self.toc_container)
+
+        # 右侧阅读正文面板
+        self.reading_container = QWidget()
+        reading_layout = QVBoxLayout(self.reading_container)
+        reading_layout.setContentsMargins(24, 16, 24, 16)
+        reading_layout.setSpacing(10)
+
+        self.chapter_title_lbl = QLabel("")
+        self.chapter_title_lbl.setStyleSheet("font-size: 20px; font-weight: bold; padding-bottom: 8px;")
+        self.chapter_title_lbl.setAlignment(Qt.AlignCenter)
+        reading_layout.addWidget(self.chapter_title_lbl)
+
+        self.text_browser = QTextBrowser()
+        self.text_browser.setOpenExternalLinks(False)
+        self.text_browser.setStyleSheet("border: none; padding: 10px;")
+        reading_layout.addWidget(self.text_browser, 1)
+
+        self.splitter.addWidget(self.reading_container)
+        self.splitter.setStretchFactor(0, 1)
+        self.splitter.setStretchFactor(1, 4)
+        main_layout.addWidget(self.splitter, 1)
+
+        # 3. 底部导航栏（上一章 / 进度 / 下一章）
+        self.bottom_bar = QWidget()
+        btm_layout = QHBoxLayout(self.bottom_bar)
+        btm_layout.setContentsMargins(20, 10, 20, 10)
+
+        self.btn_prev = QPushButton(tr("reader_prev_ch"))
+        self.btn_prev.setCursor(Qt.PointingHandCursor)
+        self.btn_prev.clicked.connect(self._prev_chapter)
+        btm_layout.addWidget(self.btn_prev)
+
+        btm_layout.addStretch()
+
+        self.progress_lbl = QLabel("0 / 0 (0%)")
+        self.progress_lbl.setStyleSheet("font-size: 13px; font-weight: bold;")
+        btm_layout.addWidget(self.progress_lbl)
+
+        btm_layout.addStretch()
+
+        self.btn_next = QPushButton(tr("reader_next_ch"))
+        self.btn_next.setCursor(Qt.PointingHandCursor)
+        self.btn_next.clicked.connect(self._next_chapter)
+        btm_layout.addWidget(self.btn_next)
+
+        main_layout.addWidget(self.bottom_bar)
+
+    def _apply_theme(self):
+        th = self.THEMES[self.current_theme]
+        bg = th["bg"]
+        txt = th["text"]
+        s_bg = th["sidebar_bg"]
+        s_txt = th["sidebar_text"]
+        bd = th["border"]
+
+        self.setStyleSheet(f"""
+            QDialog {{ background-color: {bg}; color: {txt}; }}
+            QWidget#top_bar {{ background-color: {s_bg}; border-bottom: 1px solid {bd}; }}
+            QWidget#bottom_bar {{ background-color: {s_bg}; border-top: 1px solid {bd}; }}
+            QPushButton {{
+                background-color: {s_bg};
+                color: {s_txt};
+                border: 1px solid {bd};
+                border-radius: 4px;
+                padding: 4px 10px;
+                font-size: 12px;
+            }}
+            QPushButton:hover {{ background-color: {bd}; }}
+            QLineEdit {{
+                background-color: {bg};
+                color: {txt};
+                border: 1px solid {bd};
+                border-radius: 4px;
+                padding: 4px 8px;
+            }}
+        """)
+
+        self.top_bar.setObjectName("top_bar")
+        self.bottom_bar.setObjectName("bottom_bar")
+        self.toc_container.setStyleSheet(f"background-color: {s_bg}; border-right: 1px solid {bd};")
+        self.toc_header.setStyleSheet(f"color: {s_txt}; font-size: 14px; font-weight: bold;")
+        self.toc_list.setStyleSheet(f"""
+            QListWidget {{
+                background-color: {s_bg};
+                color: {s_txt};
+                border: none;
+                outline: none;
+                font-size: 13px;
+            }}
+            QListWidget::item {{
+                padding: 6px 8px;
+                border-radius: 4px;
+            }}
+            QListWidget::item:selected {{
+                background-color: {bd};
+                color: {txt};
+                font-weight: bold;
+            }}
+        """)
+
+        self.reading_container.setStyleSheet(f"background-color: {bg};")
+        self.chapter_title_lbl.setStyleSheet(f"color: {txt}; font-size: 21px; font-weight: bold;")
+        self.text_browser.setStyleSheet(f"""
+            QTextBrowser {{
+                background-color: {bg};
+                color: {txt};
+                border: none;
+                font-family: 'PingFang SC', 'Microsoft YaHei', 'SimSun', serif;
+                font-size: {self.font_size}px;
+                line-height: 1.8;
+                padding: 10px 24px;
+            }}
+        """)
+        self.progress_lbl.setStyleSheet(f"color: {txt}; font-size: 13px;")
+
+    def _set_theme(self, theme_name: str):
+        self.current_theme = theme_name
+        self._apply_theme()
+
+    def _decrease_font(self):
+        if self.font_size > 12:
+            self.font_size -= 2
+            self._apply_theme()
+
+    def _increase_font(self):
+        if self.font_size < 36:
+            self.font_size += 2
+            self._apply_theme()
+
+    def _fetch_toc_async(self):
+        self.text_browser.setPlainText(tr("reader_loading_ch"))
+        def worker():
+            chs = ResourceSearcher.fetch_novel_chapters(self.book_url)
+            self.chapters_ready_signal.emit(chs)
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_chapters_ready(self, chapters: list):
+        self.all_chapters = chapters
+        self.toc_list.clear()
+        for idx, ch in enumerate(chapters):
+            item = QListWidgetItem(ch["title"])
+            item.setData(Qt.UserRole, idx)
+            self.toc_list.addItem(item)
+
+        if chapters:
+            self._load_chapter(0)
+        else:
+            self.text_browser.setPlainText("未成功提取到在线目录，该书可能为纯网盘转存资源。您可点击下载全本保存至本地阅读。")
+
+    def _filter_toc(self, text: str):
+        keyword = text.strip().lower()
+        for i in range(self.toc_list.count()):
+            it = self.toc_list.item(i)
+            it.setHidden(keyword not in it.text().lower())
+
+    def _load_chapter(self, index: int):
+        if not (0 <= index < len(self.all_chapters)):
+            return
+        self.current_chapter_idx = index
+        self.toc_list.setCurrentRow(index)
+        ch = self.all_chapters[index]
+        self.chapter_title_lbl.setText(ch["title"])
+        self.text_browser.setPlainText(tr("reader_loading_ch"))
+
+        total = len(self.all_chapters)
+        pct = int(((index + 1) / total) * 100) if total > 0 else 0
+        self.progress_lbl.setText(f"{index + 1} / {total} ({pct}%)")
+
+        self.btn_prev.setEnabled(index > 0)
+        self.btn_next.setEnabled(index < total - 1)
+
+        def worker():
+            t, content = ResourceSearcher.fetch_chapter_content(ch["url"])
+            self.chapter_loaded_signal.emit(t or ch["title"], content)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_chapter_loaded(self, title: str, content: str):
+        self.chapter_title_lbl.setText(title)
+        self.text_browser.setPlainText(content)
+        self.text_browser.verticalScrollBar().setValue(0)
+
+    def _on_toc_clicked(self, item: QListWidgetItem):
+        idx = item.data(Qt.UserRole)
+        self._load_chapter(idx)
+
+    def _prev_chapter(self):
+        if self.current_chapter_idx > 0:
+            self._load_chapter(self.current_chapter_idx - 1)
+
+    def _next_chapter(self):
+        if self.current_chapter_idx < len(self.all_chapters) - 1:
+            self._load_chapter(self.current_chapter_idx + 1)
+
+    def _export_full_txt(self):
+        if not self.all_chapters:
+            QMessageBox.warning(self, tr("msg_tip"), "暂无可导出的章节内容。")
+            return
+
+        save_path, _ = QFileDialog.getSaveFileName(self, "导出全本 TXT", f"{self.book_title}.txt", "Text Files (*.txt)")
+        if not save_path:
+            return
+
+        # 异步后台批量爬取章节合成 TXT
+        self.btn_export.setEnabled(False)
+        self.btn_export.setText("正在导出...")
+
+        def export_worker():
+            try:
+                with open(save_path, "w", encoding="utf-8") as f:
+                    f.write(f"《{self.book_title}》\n\n")
+                    for i, ch in enumerate(self.all_chapters):
+                        t, content = ResourceSearcher.fetch_chapter_content(ch["url"])
+                        f.write(f"{t or ch['title']}\n\n")
+                        f.write(content + "\n\n" + "="*40 + "\n\n")
+                QTimer.singleShot(0, lambda: QMessageBox.information(self, tr("msg_tip"), tr("reader_export_done", path=save_path)))
+            except Exception as e:
+                QTimer.singleShot(0, lambda: QMessageBox.warning(self, tr("msg_tip"), f"导出失败: {e}"))
+            finally:
+                QTimer.singleShot(0, lambda: (self.btn_export.setEnabled(True), self.btn_export.setText(tr("reader_export_txt"))))
+
+        threading.Thread(target=export_worker, daemon=True).start()
+
+
 class WorkerSignals(QObject):
 
     log_signal = pyqtSignal(str)
@@ -824,6 +1186,11 @@ class MainWindow(QMainWindow):
         self.chk_video.stateChanged.connect(self.filter_table)
         filter_layout.addWidget(self.chk_video)
 
+        self.chk_novel = QCheckBox()
+        self.chk_novel.setChecked(True)
+        self.chk_novel.stateChanged.connect(self.filter_table)
+        filter_layout.addWidget(self.chk_novel)
+
         self.chk_software = QCheckBox()
         self.chk_software.setChecked(True)
         self.chk_software.stateChanged.connect(self.filter_table)
@@ -935,6 +1302,7 @@ class MainWindow(QMainWindow):
 
         self.filter_group.setTitle(tr("filter_group"))
         self.chk_video.setText(tr("chk_video"))
+        self.chk_novel.setText(tr("chk_novel"))
         self.chk_software.setText(tr("chk_software"))
         self.chk_doc.setText(tr("chk_doc"))
         self.chk_image.setText(tr("chk_image"))
@@ -1036,6 +1404,7 @@ class MainWindow(QMainWindow):
 
     def filter_table(self):
         show_video = self.chk_video.isChecked()
+        show_novel = self.chk_novel.isChecked()
         show_software = self.chk_software.isChecked()
         show_doc = self.chk_doc.isChecked()
         show_image = self.chk_image.isChecked()
@@ -1045,8 +1414,10 @@ class MainWindow(QMainWindow):
             cat = r["category"]
             if cat in ["video", "video_stream", "audio"] and show_video:
                 filtered.append(r)
+            elif cat == "novel" and show_novel:
+                filtered.append(r)
             elif cat in ["pan_drive", "magnet"]:
-                if show_video or show_doc or show_software:
+                if show_video or show_doc or show_software or show_novel:
                     filtered.append(r)
             elif cat == "software" and show_software:
                 filtered.append(r)
@@ -1084,7 +1455,7 @@ class MainWindow(QMainWindow):
             size_item.setTextAlignment(Qt.AlignCenter)
             self.table.setItem(row, 3, size_item)
 
-            # 4. 快速操作列（直观的【▶ 立即播放】、【☁️ 转存网盘】、【🧲 磁力直通】与【⬇ 下载】）
+            # 4. 快速操作列（直观的【▶ 立即播放】、【📖 在线阅读】、【☁️ 转存网盘】、【🧲 磁力直通】与【⬇ 下载】）
             btn_container = QWidget()
             btn_layout = QHBoxLayout(btn_container)
             btn_layout.setContentsMargins(2, 2, 2, 2)
@@ -1095,6 +1466,22 @@ class MainWindow(QMainWindow):
                 play_btn.setStyleSheet("background-color: #00C853; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
                 play_btn.clicked.connect(lambda checked, url=item["url"], t=clean_name, ref=item.get("referer", ""): self.play_item_stream(url, t, ref))
                 btn_layout.addWidget(play_btn)
+            elif item["category"] == "novel":
+                if item.get("sub_category") == "novel_online":
+                    read_btn = QPushButton(tr("btn_read_novel"))
+                    read_btn.setStyleSheet("background-color: #00897B; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
+                    read_btn.clicked.connect(lambda checked, it=item: self.open_novel_reader(it))
+                    btn_layout.addWidget(read_btn)
+                else:
+                    pan_btn = QPushButton(tr("btn_pan"))
+                    pan_btn.setStyleSheet("background-color: #7B1FA2; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
+                    pan_btn.clicked.connect(lambda checked, it=item: self.open_pan_drive_item(it))
+                    btn_layout.addWidget(pan_btn)
+
+                down_btn = QPushButton(tr("btn_download_novel"))
+                down_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
+                down_btn.clicked.connect(lambda checked, it=item: self.download_novel_item(it))
+                btn_layout.addWidget(down_btn)
             elif item["category"] == "pan_drive":
                 pan_btn = QPushButton(tr("btn_pan"))
                 pan_btn.setStyleSheet("background-color: #7B1FA2; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
@@ -1190,6 +1577,20 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, tr("magnet_copied_title"), tr("magnet_copied_msg"))
         QDesktopServices.openUrl(QUrl(url))
 
+    def open_novel_reader(self, item: dict):
+        """唤醒专用小说原生阅读窗口"""
+        self.append_log(f"【小说阅读】正在打开专属极速阅读窗口: 《{item.get('label', '')}》")
+        dialog = NovelReaderDialog(item, parent=self)
+        dialog.exec_()
+
+    def download_novel_item(self, item: dict):
+        """小说全本下载：若是网盘直链直接唤起网盘转存，若是纯在线则打开阅读器一键导出TXT"""
+        sub_cat = item.get("sub_category", "")
+        if sub_cat == "novel_pan" or "pan." in item.get("url", ""):
+            self.open_pan_drive_item(item)
+        else:
+            self.open_novel_reader(item)
+
     def on_table_double_clicked(self, item):
         row = item.row()
         chk_item = self.table.item(row, 0)
@@ -1203,6 +1604,11 @@ class MainWindow(QMainWindow):
             title = self.table.item(row, 1).text() if self.table.item(row, 1) else "视频"
             referer = data.get("referer", "")
             self.play_item_stream(url, title, referer)
+        elif data.get("category") == "novel":
+            if data.get("sub_category") == "novel_online":
+                self.open_novel_reader(data)
+            else:
+                self.open_pan_drive_item(data)
         elif data.get("category") == "pan_drive":
             self.open_pan_drive_item(data)
         elif data.get("category") == "magnet":

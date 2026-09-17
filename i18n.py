@@ -20,6 +20,7 @@ TRANSLATIONS = {
         # 过滤器
         "filter_group": "分类过滤",
         "chk_video": "🎬 影视流媒体 (在线秒播)",
+        "chk_novel": "📚 电子小说 (全本/在线读)",
         "chk_software": "💻 软件应用 (安装包/工具)",
         "chk_doc": "📄 办公文档 (简历/合同/PPT)",
         "chk_image": "🖼 图像相册 (海报/壁纸)",
@@ -38,6 +39,7 @@ TRANSLATIONS = {
         # 表格分类说明
         "cat_video": "🎬 高清视频",
         "cat_video_stream": "🎬 在线影视 (秒开即播/可下载)",
+        "cat_novel": "📚 电子小说 (全本/章节)",
         "cat_software": "💻 软件应用",
         "cat_document": "📄 办公文档",
         "cat_pan_drive": "☁️ 网盘转存 (免限速原画)",
@@ -49,9 +51,27 @@ TRANSLATIONS = {
         # 表格内操作按钮
         "btn_play": "▶ 播放",
         "btn_preview": "🔍 预览",
+        "btn_read_novel": "📖 在线阅读",
+        "btn_download_novel": "⬇ 下载全本",
         "btn_download_single": "⬇ 下载",
         "btn_pan": "☁️ 转存网盘",
         "btn_magnet": "🧲 磁力直通",
+        
+        # 小说专属阅读器
+        "reader_title": "📖 万象阅读器: 《{title}》",
+        "reader_toc": "📑 章节目录",
+        "reader_toc_search": "🔍 搜索章节...",
+        "reader_theme_green": "🌿 护眼绿",
+        "reader_theme_parchment": "📜 羊皮纸",
+        "reader_theme_dark": "🌙 夜间暗黑",
+        "reader_theme_white": "⚪ 简约白",
+        "reader_prev_ch": "⬅ 上一章",
+        "reader_next_ch": "下一章 ➡",
+        "reader_export_txt": "💾 导出全本TXT",
+        "reader_font_smaller": "A- 缩小",
+        "reader_font_larger": "A+ 放大",
+        "reader_loading_ch": "⏳ 正在极速加载章节正文...",
+        "reader_export_done": "🎉 全本小说已成功导出至:\n{path}",
         
         # 统计栏
         "stats_template": "📊 统计信息: 当前共 {total} 个资源 | 已选择 {selected} 项 | 预估总大小: {size}",
@@ -138,6 +158,7 @@ TRANSLATIONS = {
         # Filters
         "filter_group": "Filter Categories",
         "chk_video": "🎬 Video Streaming (Instant Play)",
+        "chk_novel": "📚 Novels & E-books (Full / Read Online)",
         "chk_software": "💻 Software / Apps (Installers)",
         "chk_doc": "📄 Documents (Word/PDF/Templates)",
         "chk_image": "🖼 Images & Wallpapers",
@@ -156,6 +177,7 @@ TRANSLATIONS = {
         # Category Descriptions
         "cat_video": "🎬 HD Video",
         "cat_video_stream": "🎬 Live Stream (Instant / Downloadable)",
+        "cat_novel": "📚 E-book / Novel (Full / Online)",
         "cat_software": "💻 Software Application",
         "cat_document": "📄 Office Document",
         "cat_pan_drive": "☁️ Cloud Drive (Fast & Original)",
@@ -167,9 +189,27 @@ TRANSLATIONS = {
         # In-table Action Buttons
         "btn_play": "▶ Play",
         "btn_preview": "🔍 Preview",
+        "btn_read_novel": "📖 Read Online",
+        "btn_download_novel": "⬇ Download Book",
         "btn_download_single": "⬇ Download",
         "btn_pan": "☁️ Cloud Drive",
         "btn_magnet": "🧲 Magnet Direct",
+        
+        # Novel Dedicated Reader
+        "reader_title": "📖 OmniReader: 《{title}》",
+        "reader_toc": "📑 Table of Contents",
+        "reader_toc_search": "🔍 Search chapters...",
+        "reader_theme_green": "🌿 Eye-care Green",
+        "reader_theme_parchment": "📜 Parchment",
+        "reader_theme_dark": "🌙 Dark Night",
+        "reader_theme_white": "⚪ Clean White",
+        "reader_prev_ch": "⬅ Prev Chapter",
+        "reader_next_ch": "Next Chapter ➡",
+        "reader_export_txt": "💾 Export Full TXT",
+        "reader_font_smaller": "A- Smaller",
+        "reader_font_larger": "A+ Larger",
+        "reader_loading_ch": "⏳ Fetching chapter contents...",
+        "reader_export_done": "🎉 Novel successfully exported to:\n{path}",
         
         # Stats
         "stats_template": "📊 Statistics: {total} items found | {selected} selected | Estimated size: {size}",
@@ -256,6 +296,7 @@ TRANSLATIONS = {
         # 過濾器
         "filter_group": "分類過濾",
         "chk_video": "🎬 影視串流 (線上秒播)",
+        "chk_novel": "📚 電子小說 (全本/線上讀)",
         "chk_software": "💻 軟體應用 (安裝包/工具)",
         "chk_doc": "📄 辦公文檔 (簡歷/合約/PPT)",
         "chk_image": "🖼 圖像相簿 (海报/桌布)",
@@ -274,6 +315,7 @@ TRANSLATIONS = {
         # 表格分類說明
         "cat_video": "🎬 高清影片",
         "cat_video_stream": "🎬 線上影視 (秒開即播/可下載)",
+        "cat_novel": "📚 電子小說 (全本/章節)",
         "cat_software": "💻 軟體應用",
         "cat_document": "📄 辦公文檔",
         "cat_pan_drive": "☁️ 網盤轉存 (免限速原畫)",
@@ -285,9 +327,27 @@ TRANSLATIONS = {
         # 按鈕
         "btn_play": "▶ 播放",
         "btn_preview": "🔍 預覽",
+        "btn_read_novel": "📖 線上閱讀",
+        "btn_download_novel": "⬇ 下載全本",
         "btn_download_single": "⬇ 下載",
         "btn_pan": "☁️ 轉存網盤",
         "btn_magnet": "🧲 磁力直通",
+        
+        # 小說專屬閱讀器
+        "reader_title": "📖 萬象閱讀器: 《{title}》",
+        "reader_toc": "📑 章節目錄",
+        "reader_toc_search": "🔍 搜尋章節...",
+        "reader_theme_green": "🌿 護眼綠",
+        "reader_theme_parchment": "📜 羊皮紙",
+        "reader_theme_dark": "🌙 夜間暗黑",
+        "reader_theme_white": "⚪ 簡約白",
+        "reader_prev_ch": "⬅ 上一章",
+        "reader_next_ch": "下一章 ➡",
+        "reader_export_txt": "💾 匯出全本TXT",
+        "reader_font_smaller": "A- 縮小",
+        "reader_font_larger": "A+ 放大",
+        "reader_loading_ch": "⏳ 正在極速載入章節正文...",
+        "reader_export_done": "🎉 全本小說已成功匯出至:\n{path}",
         
         # 統計欄
         "stats_template": "📊 統計資訊: 目前共 {total} 個資源 | 已選擇 {selected} 項 | 預估總大小: {size}",
@@ -374,6 +434,7 @@ TRANSLATIONS = {
         # フィルター
         "filter_group": "カテゴリ絞り込み",
         "chk_video": "🎬 動画ストリーミング (即時再生)",
+        "chk_novel": "📚 電子小説・書籍 (全編/オンライン読書)",
         "chk_software": "💻 ソフトウェア (インストーラー)",
         "chk_doc": "📄 ドキュメント (Word/PDF/テンプレート)",
         "chk_image": "🖼 画像 / 壁紙",
@@ -392,6 +453,7 @@ TRANSLATIONS = {
         # カテゴリ説明
         "cat_video": "🎬 HD動画",
         "cat_video_stream": "🎬 ストリーム (即時再生/DL可能)",
+        "cat_novel": "📚 電子小説 (全巻/章)",
         "cat_software": "💻 アプリケーション",
         "cat_document": "📄 ドキュメント",
         "cat_pan_drive": "☁️ クラウド共有 (原画保存)",
@@ -403,9 +465,27 @@ TRANSLATIONS = {
         # ボタン
         "btn_play": "▶ 再生",
         "btn_preview": "🔍 プレビュー",
+        "btn_read_novel": "📖 オンライン読書",
+        "btn_download_novel": "⬇ 全巻ダウンロード",
         "btn_download_single": "⬇ ダウンロード",
         "btn_pan": "☁️ クラウドへ保存",
         "btn_magnet": "🧲 マグネット取得",
+        
+        # 専用小説リーダー
+        "reader_title": "📖 Omniリーダー: 《{title}》",
+        "reader_toc": "📑 目次",
+        "reader_toc_search": "🔍 章を検索...",
+        "reader_theme_green": "🌿 アイケアグリーン",
+        "reader_theme_parchment": "📜 羊皮紙",
+        "reader_theme_dark": "🌙 ダークナイト",
+        "reader_theme_white": "⚪ クリーンホワイト",
+        "reader_prev_ch": "⬅ 前の章",
+        "reader_next_ch": "次の章 ➡",
+        "reader_export_txt": "💾 全文TXT出力",
+        "reader_font_smaller": "A- 縮小",
+        "reader_font_larger": "A+ 拡大",
+        "reader_loading_ch": "⏳ 章の本文を読み込み中...",
+        "reader_export_done": "🎉 小説の全編を出力しました:\n{path}",
         
         # 統計
         "stats_template": "📊 統計: 合計 {total} 件 | 選択済み {selected} 件 | 推定サイズ: {size}",
@@ -492,6 +572,7 @@ TRANSLATIONS = {
         # 필터
         "filter_group": "카테고리 필터",
         "chk_video": "🎬 비디오 스트리밍 (즉시 재생)",
+        "chk_novel": "📚 전자소설·도서 (전권/온라인 읽기)",
         "chk_software": "💻 소프트웨어 (설치 프로그램)",
         "chk_doc": "📄 오피스 문서 (이력서/서식/PPT)",
         "chk_image": "🖼 이미지 / 배경화면",
@@ -510,6 +591,7 @@ TRANSLATIONS = {
         # 카테고리 설명
         "cat_video": "🎬 HD 비디오",
         "cat_video_stream": "🎬 스트리밍 (즉시 재생/다운로드)",
+        "cat_novel": "📚 전자소설 (전권/챕터)",
         "cat_software": "💻 소프트웨어 응용 프로그램",
         "cat_document": "📄 문서 자료",
         "cat_pan_drive": "☁️ 클라우드 드라이브 (고속 원본)",
@@ -521,9 +603,27 @@ TRANSLATIONS = {
         # 버튼
         "btn_play": "▶ 재생",
         "btn_preview": "🔍 미리보기",
+        "btn_read_novel": "📖 온라인 읽기",
+        "btn_download_novel": "⬇ 전권 다운로드",
         "btn_download_single": "⬇ 다운로드",
         "btn_pan": "☁️ 클라우드 저장",
         "btn_magnet": "🧲 마그넷 바로가기",
+        
+        # 소설 전용 뷰어
+        "reader_title": "📖 Omni 리더: 《{title}》",
+        "reader_toc": "📑 목차",
+        "reader_toc_search": "🔍 챕터 검색...",
+        "reader_theme_green": "🌿 아이케어 그린",
+        "reader_theme_parchment": "📜 양장지",
+        "reader_theme_dark": "🌙 다크 나이트",
+        "reader_theme_white": "⚪ 클린 화이트",
+        "reader_prev_ch": "⬅ 이전 챕터",
+        "reader_next_ch": "다음 챕터 ➡",
+        "reader_export_txt": "💾 전권 TXT 내보내기",
+        "reader_font_smaller": "A- 축소",
+        "reader_font_larger": "A+ 확대",
+        "reader_loading_ch": "⏳ 챕터 본문 불러오는 중...",
+        "reader_export_done": "🎉 소설 전권을 성공적으로 내보냈습니다:\n{path}",
         
         # 통계
         "stats_template": "📊 통계: 총 {total} 개 항목 | {selected} 개 선택됨 | 예상 크기: {size}",

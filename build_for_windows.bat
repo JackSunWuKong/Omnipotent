@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 echo ========================================================
-echo   万能钥匙 (UniversalKey) - Windows 一键全自动打包构建
+echo   OmniFinder (万象探索) - Windows 一键全自动打包构建
 echo ========================================================
 echo.
 
@@ -19,7 +19,7 @@ pip install -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.al
 echo.
 echo [第 2 步 / 共 3 步] 正在使用 PyInstaller 封装独立 Windows 应用程序...
 pyinstaller --noconfirm --onedir --windowed ^
-    --name="万能钥匙" ^
+    --name="OmniFinder" ^
     --add-data="sniffer_magic.py;." ^
     --add-data="downloader.py;." ^
     --add-data="sniffer_engine.py;." ^
@@ -33,18 +33,14 @@ pyinstaller --noconfirm --onedir --windowed ^
 
 echo.
 echo ========================================================
-if exist "dist\万能钥匙\万能钥匙.exe" (
+if exist "dist\OmniFinder\OmniFinder.exe" (
     echo [第 3 步 / 共 3 步] 应用程序已成功构建在:
-    echo        dist\万能钥匙\万能钥匙.exe
+    echo        dist\OmniFinder\OmniFinder.exe
     echo.
     echo --------------------------------------------------------
     echo 【直接交付方案】:
-    echo  您可以直接把整个 "dist\万能钥匙" 文件夹压缩成 zip 发给同事，
-    echo  同事解压后双击 "万能钥匙.exe" 即可直接使用（无需安装Python）！
-    echo.
-    echo 【制作像 LOL 一样的单文件安装包向导】:
-    echo  若已安装 Inno Setup 编译器，打开本目录的 "build_windows_installer.iss"
-    echo  点击 Compile，即可秒级生成 "万能钥匙_极速安装向导.exe"！
+    echo  您可以直接把整个 "dist\OmniFinder" 文件夹压缩成 zip 发给同事，
+    echo  同事解压后双击 "OmniFinder.exe" 即可直接使用（无需安装Python）！
     echo --------------------------------------------------------
 ) else (
     echo [打包失败] 请检查上方 Python / PyInstaller 报错信息。

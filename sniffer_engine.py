@@ -528,7 +528,7 @@ class SnifferEngine:
         万能智能自适应嗅探器：
         纯自动化全息嗅探体系，内部已集成静态DOM穿透、CMS解析与自适应无缝升级CDP沙箱。
         """
-        self.log_cb(f"【万能钥匙引擎】正在自适应解析目标网址: {target_url}")
+        self.log_cb(f"【OmniFinder 引擎】正在自适应解析目标网址: {target_url}")
         return self.analyze_static_and_dom(target_url)
 
 

@@ -2,7 +2,7 @@ import sys, os, subprocess
 
 def main():
     print('========================================================')
-    print('      万能钥匙 (UniversalKey) - 自动打包工具')
+    print('      OmniFinder (万象探索) - 自动打包工具')
     print('========================================================')
     print()
 
@@ -22,7 +22,7 @@ def main():
         '--noconfirm',
         '--onefile',
         '--windowed',
-        '--name=万能钥匙',
+        '--name=OmniFinder',
         '--add-data=sniffer_magic.py;.',
         '--add-data=downloader.py;.',
         '--add-data=sniffer_engine.py;.',
@@ -39,8 +39,8 @@ def main():
     print('========================================================')
     if ret == 0:
         print('【大功告成！】')
-        print('可执行文件已生成在: dist\万能钥匙.exe')
-        print('您可以直接将 dist\万能钥匙.exe 复制给任何人使用！')
+        print('可执行文件已生成在: dist\\OmniFinder.exe')
+        print('您可以直接将 dist\\OmniFinder.exe 复制给任何人使用！')
     else:
         print('打包遇到错误，请查看上方提示信息。')
     print('========================================================')

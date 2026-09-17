@@ -1,13 +1,13 @@
 ; ========================================================
-; 万能钥匙 (UniversalKey) - 商业旗舰级 Windows 安装包制作脚本
+; OmniFinder (万象探索) - Windows 安装包制作脚本
 ; 基于 Inno Setup 6 构建
 ; ========================================================
 
-#define MyAppName "万能钥匙"
+#define MyAppName "OmniFinder"
 #define MyAppVersion "2.0.0"
-#define MyAppPublisher "Universal Studio"
+#define MyAppPublisher "OmniFinder Community"
 #define MyAppURL "https://github.com"
-#define MyAppExeName "万能钥匙.exe"
+#define MyAppExeName "OmniFinder.exe"
 
 [Setup]
 ; 基础应用信息
@@ -26,11 +26,11 @@ DefaultGroupName={#MyAppName}
 
 ; 输出配置
 OutputDir=installer_output
-OutputBaseFilename=万能钥匙_极速安装向导_v{#MyAppVersion}
+OutputBaseFilename=OmniFinder_安装向导_v{#MyAppVersion}
 Compression=lzma2/ultra64
 SolidCompression=yes
 
-; 界面视觉风格（像LOL一样现代直观的安装向导）
+; 界面视觉风格
 WizardStyle=modern
 PrivilegesRequired=lowest
 ArchitecturesInstallIn64BitMode=x64
@@ -43,7 +43,7 @@ Name: "desktopicon"; Description: "创建桌面快捷方式 (&D)"; GroupDescript
 
 [Files]
 ; 打包后的整个目录文件全部打包进安装程序
-Source: "dist\万能钥匙\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\OmniFinder\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 ; 开始菜单与桌面图标配置

@@ -685,7 +685,7 @@ class WorkerSignals(QObject):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("智能通用网页嗅探与全网资源搜索引擎 (商业旗舰版)")
+        self.setWindowTitle("万象探索 (OmniFinder) - 个人网络多媒体与资源探索助手 (学习研究版)")
         self.resize(1150, 820)
 
         self.signals = WorkerSignals()
@@ -708,7 +708,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
 
-        # 1. 顶部“万能钥匙”极速接入控制台
+        # 1. 顶部 OmniFinder 极速接入控制台
         self.omni_group = QGroupBox()
         self.omni_group.setStyleSheet("""
             QGroupBox {

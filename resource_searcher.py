@@ -602,12 +602,12 @@ class ResourceSearcher:
 
         results = []
         if is_doc_intent:
-            self.log_cb(f"【万能钥匙】检测到办公/文档/素材意图，优先检索全国模板库与文档资源...")
+            self.log_cb(f"【OmniFinder】检测到办公/文档/素材意图，优先检索全国模板库与文档资源...")
             results.extend(self.search_documents(keyword))
             video_results = self.search_videos(keyword)
             results.extend(video_results)
         elif is_software_intent:
-            self.log_cb(f"【万能钥匙】检测到应用/软件/工具意图，优先检索全网软件下载矩阵...")
+            self.log_cb(f"【OmniFinder】检测到应用/软件/工具意图，优先检索全网软件下载矩阵...")
             results.extend(self.search_software(keyword))
             video_results = self.search_videos(keyword)
             results.extend(video_results)

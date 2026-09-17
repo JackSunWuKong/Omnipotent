@@ -15,6 +15,7 @@ TRANSLATIONS = {
         "omni_placeholder": "💡 随意输入：网页URL（如爱优腾/B站/各类影视站）、影视剧名称（如流浪地球/狂飙）、或磁力magnet链接...",
         "btn_omni": "⚡ 一键破译 / 极速搜索",
         "chk_force_browser": "强力穿透模式 (遇到特种 Cloudflare/极难防护站时勾选)",
+        "chk_deep_dive": "🌊 全网深潜模式 (网盘暗搜+全球磁力+绝版冷门穿透)",
         "lbl_tip": "✨ 智能路由：自动判断网页或剧名，0 学习成本，内置秒级全网聚合节点与本地流媒体代理",
         
         # 过滤器
@@ -40,6 +41,8 @@ TRANSLATIONS = {
         "cat_video_stream": "🎬 在线影视 (秒开即播/可下载)",
         "cat_software": "💻 软件应用",
         "cat_document": "📄 办公文档",
+        "cat_pan_drive": "☁️ 网盘转存 (免限速原画)",
+        "cat_magnet": "🧲 磁力链接 (P2P高速)",
         "cat_audio": "🎵 音频资源",
         "cat_image": "🖼 图像海报",
         "cat_other": "其他资源",
@@ -48,6 +51,8 @@ TRANSLATIONS = {
         "btn_play": "▶ 播放",
         "btn_preview": "🔍 预览",
         "btn_download_single": "⬇ 下载",
+        "btn_pan": "☁️ 转存网盘",
+        "btn_magnet": "🧲 磁力直通",
         
         # 统计栏
         "stats_template": "📊 统计信息: 当前共 {total} 个资源 | 已选择 {selected} 项 | 预估总大小: {size}",
@@ -68,6 +73,10 @@ TRANSLATIONS = {
         "msg_download_done_general": "所选资源已下载完成，保存目录：\n{dir}",
         "msg_copy_success": "已成功复制到剪贴板！",
         "msg_no_selected": "请先勾选需要下载的资源项！",
+        "pan_copied_title": "网盘链接与提取码已就绪",
+        "pan_copied_msg": "已复制网盘链接与提取码到剪贴板！\n链接: {url}\n提取码: {pwd}\n即将为您自动打开浏览器...",
+        "magnet_copied_title": "磁力链接已复制",
+        "magnet_copied_msg": "已成功将磁力链接 (magnet:?...) 复制到剪贴板！\n您可以直接粘贴至迅雷、BitComet、Aria2 或客户端下载。",
         
         # 播放弹窗
         "player_title": "🎬 极速硬件播放: {title}",
@@ -125,6 +134,7 @@ TRANSLATIONS = {
         "omni_placeholder": "💡 Enter URL (YouTube/Bilibili/Streaming Sites), Movie Title, or Magnet Link...",
         "btn_omni": "⚡ One-Click Parse / Search",
         "chk_force_browser": "Deep Penetration Mode (For Cloudflare / Complex Protected Sites)",
+        "chk_deep_dive": "🌊 Deep Dive Mode (Pan Cloud + Global Magnet/DHT + Rare Titles)",
         "lbl_tip": "✨ Smart Routing: Automatic media type detection, zero learning curve, local loopback proxy",
         
         # Filters
@@ -150,6 +160,8 @@ TRANSLATIONS = {
         "cat_video_stream": "🎬 Live Stream (Instant / Downloadable)",
         "cat_software": "💻 Software Application",
         "cat_document": "📄 Office Document",
+        "cat_pan_drive": "☁️ Cloud Drive (Fast & Original)",
+        "cat_magnet": "🧲 Magnet Link (P2P High-Speed)",
         "cat_audio": "🎵 Audio Resource",
         "cat_image": "🖼 Image / Poster",
         "cat_other": "Other Resource",
@@ -158,6 +170,8 @@ TRANSLATIONS = {
         "btn_play": "▶ Play",
         "btn_preview": "🔍 Preview",
         "btn_download_single": "⬇ Download",
+        "btn_pan": "☁️ Cloud Drive",
+        "btn_magnet": "🧲 Magnet Direct",
         
         # Stats
         "stats_template": "📊 Statistics: {total} items found | {selected} selected | Estimated size: {size}",
@@ -178,6 +192,10 @@ TRANSLATIONS = {
         "msg_download_done_general": "Selected resources downloaded to:\n{dir}",
         "msg_copy_success": "Link copied to clipboard!",
         "msg_no_selected": "Please select at least one item to download!",
+        "pan_copied_title": "Cloud Link & Passcode Ready",
+        "pan_copied_msg": "Link and passcode copied to clipboard!\nURL: {url}\nCode: {pwd}\nOpening browser...",
+        "magnet_copied_title": "Magnet Link Copied",
+        "magnet_copied_msg": "Magnet link copied to clipboard!\nYou can paste it directly into Thunder, BitComet, qBittorrent, or Aria2.",
         
         # Player Dialog
         "player_title": "🎬 Hardware Accelerated Player: {title}",
@@ -235,6 +253,7 @@ TRANSLATIONS = {
         "omni_placeholder": "💡 隨意輸入：網頁URL、影視劇名稱、或磁力magnet連結...",
         "btn_omni": "⚡ 一鍵破譯 / 極速搜尋",
         "chk_force_browser": "強力穿透模式 (遇到特種 Cloudflare/極難防護站時勾選)",
+        "chk_deep_dive": "🌊 全網深潛模式 (網盤暗搜+全球磁力+絕版冷門穿透)",
         "lbl_tip": "✨ 智慧路由：自動判斷網頁或劇名，0 學習成本，內建秒級全網聚合節點與本地流媒體代理",
         
         # 過濾器
@@ -242,7 +261,7 @@ TRANSLATIONS = {
         "chk_video": "🎬 影視串流 (線上秒播)",
         "chk_software": "💻 軟體應用 (安裝包/工具)",
         "chk_doc": "📄 辦公文檔 (簡歷/合約/PPT)",
-        "chk_image": "🖼 圖像相簿 (海報/桌布)",
+        "chk_image": "🖼 圖像相簿 (海报/桌布)",
         "btn_select_all": "全選顯示項",
         "btn_deselect_all": "取消全選",
         
@@ -260,6 +279,8 @@ TRANSLATIONS = {
         "cat_video_stream": "🎬 線上影視 (秒開即播/可下載)",
         "cat_software": "💻 軟體應用",
         "cat_document": "📄 辦公文檔",
+        "cat_pan_drive": "☁️ 網盤轉存 (免限速原畫)",
+        "cat_magnet": "🧲 磁力連結 (P2P高速)",
         "cat_audio": "🎵 音訊資源",
         "cat_image": "🖼 圖像海報",
         "cat_other": "其他資源",
@@ -268,6 +289,8 @@ TRANSLATIONS = {
         "btn_play": "▶ 播放",
         "btn_preview": "🔍 預覽",
         "btn_download_single": "⬇ 下載",
+        "btn_pan": "☁️ 轉存網盤",
+        "btn_magnet": "🧲 磁力直通",
         
         # 統計欄
         "stats_template": "📊 統計資訊: 目前共 {total} 個資源 | 已選擇 {selected} 項 | 預估總大小: {size}",
@@ -288,6 +311,10 @@ TRANSLATIONS = {
         "msg_download_done_general": "所選資源已下載完成，儲存目錄：\n{dir}",
         "msg_copy_success": "已成功複製到剪貼簿！",
         "msg_no_selected": "請先勾選需要下載的資源項！",
+        "pan_copied_title": "網盤連結與提取碼已就緒",
+        "pan_copied_msg": "已複製網盤連結與提取碼至剪貼簿！\n連結: {url}\n提取碼: {pwd}\n即將自動開啟瀏覽器...",
+        "magnet_copied_title": "磁力連結已複製",
+        "magnet_copied_msg": "已成功將磁力連結複製至剪貼簿！\n您可以直接貼至迅雷、BitComet、Aria2 進行下載。",
         
         # 播放彈窗
         "player_title": "🎬 極速硬體播放: {title}",
@@ -345,6 +372,7 @@ TRANSLATIONS = {
         "omni_placeholder": "💡 URL（YouTube/Bilibili/動画配信サイト）、タイトル、またはMagnetリンクを入力...",
         "btn_omni": "⚡ 解析 / 高速検索",
         "chk_force_browser": "ディープペネトレーションモード（Cloudflare保護サイト用）",
+        "chk_deep_dive": "🌊 ディープダイブモード (クラウド+マグネット+レア作品発掘)",
         "lbl_tip": "✨ スマートルーティング：自動メディア検出、ローカルプロキシ搭載、ゼロ学習コスト",
         
         # フィルター
@@ -370,6 +398,8 @@ TRANSLATIONS = {
         "cat_video_stream": "🎬 ストリーム (即時再生/DL可能)",
         "cat_software": "💻 アプリケーション",
         "cat_document": "📄 ドキュメント",
+        "cat_pan_drive": "☁️ クラウド共有 (原画保存)",
+        "cat_magnet": "🧲 マグネットリンク (P2P高速)",
         "cat_audio": "🎵 音楽 / 音声",
         "cat_image": "🖼 画像ポスター",
         "cat_other": "その他",
@@ -378,6 +408,8 @@ TRANSLATIONS = {
         "btn_play": "▶ 再生",
         "btn_preview": "🔍 プレビュー",
         "btn_download_single": "⬇ ダウンロード",
+        "btn_pan": "☁️ クラウドへ保存",
+        "btn_magnet": "🧲 マグネット取得",
         
         # 統計
         "stats_template": "📊 統計: 合計 {total} 件 | 選択済み {selected} 件 | 推定サイズ: {size}",
@@ -398,6 +430,10 @@ TRANSLATIONS = {
         "msg_download_done_general": "ダウンロード完了。保存先:\n{dir}",
         "msg_copy_success": "クリップボードにコピーしました！",
         "msg_no_selected": "ダウンロードするリソースを選択してください！",
+        "pan_copied_title": "クラウドURLとパスコード取得完了",
+        "pan_copied_msg": "URLとパスコードをクリップボードにコピーしました！\nURL: {url}\nコード: {pwd}\nブラウザを開きます...",
+        "magnet_copied_title": "マグネットリンクをコピーしました",
+        "magnet_copied_msg": "マグネットリンクをクリップボードにコピーしました！\nBitTorrentやThunderなどに貼り付けてダウンロードできます。",
         
         # プレイヤー
         "player_title": "🎬 高速ハードウェア再生: {title}",
@@ -455,6 +491,7 @@ TRANSLATIONS = {
         "omni_placeholder": "💡 웹페이지 URL, 영화/드라마 제목, 또는 마그넷 링크를 입력하세요...",
         "btn_omni": "⚡ 원클릭 분석 / 검색",
         "chk_force_browser": "강력 침투 모드 (Cloudflare 등 보호 사이트 전용)",
+        "chk_deep_dive": "🌊 딥 다이브 모드 (클라우드+마그넷+희귀/절판 리소스 탐색)",
         "lbl_tip": "✨ 스마트 라우팅: 자동 미디어 판별, 로컬 프록시 내장, 쉬운 사용성",
         
         # 필터
@@ -480,6 +517,8 @@ TRANSLATIONS = {
         "cat_video_stream": "🎬 스트리밍 (즉시 재생/다운로드)",
         "cat_software": "💻 소프트웨어 응용 프로그램",
         "cat_document": "📄 문서 자료",
+        "cat_pan_drive": "☁️ 클라우드 드라이브 (고속 원본)",
+        "cat_magnet": "🧲 마그넷 링크 (P2P 고속)",
         "cat_audio": "🎵 오디오 리소스",
         "cat_image": "🖼 이미지 포스터",
         "cat_other": "기타 리소스",
@@ -488,6 +527,8 @@ TRANSLATIONS = {
         "btn_play": "▶ 재생",
         "btn_preview": "🔍 미리보기",
         "btn_download_single": "⬇ 다운로드",
+        "btn_pan": "☁️ 클라우드 저장",
+        "btn_magnet": "🧲 마그넷 바로가기",
         
         # 통계
         "stats_template": "📊 통계: 총 {total} 개 항목 | {selected} 개 선택됨 | 예상 크기: {size}",
@@ -508,6 +549,10 @@ TRANSLATIONS = {
         "msg_download_done_general": "다운로드가 완료되었습니다. 저장 경로:\n{dir}",
         "msg_copy_success": "클립보드에 복사되었습니다!",
         "msg_no_selected": "다운로드할 리소스를 선택해 주세요!",
+        "pan_copied_title": "클라우드 링크 및 비밀번호 준비 완료",
+        "pan_copied_msg": "링크와 비밀번호가 클립보드에 복사되었습니다!\nURL: {url}\n비밀번호: {pwd}\n브라우저를 엽니다...",
+        "magnet_copied_title": "마그넷 링크 복사됨",
+        "magnet_copied_msg": "마그넷 링크가 클립보드에 복사되었습니다!\n토렌트 클라이언트나 다운로더에 붙여넣어 다운로드할 수 있습니다.",
         
         # 플레이어
         "player_title": "🎬 하드웨어 가속 플레이어: {title}",

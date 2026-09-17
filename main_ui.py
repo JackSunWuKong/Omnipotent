@@ -28,7 +28,7 @@ from PyQt5.QtWidgets import (
 
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 
-from PyQt5.QtGui import QInputMethodEvent, QPixmap, QIcon, QFont
+from PyQt5.QtGui import QInputMethodEvent, QPixmap, QIcon, QFont, QDesktopServices
 
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtMultimediaWidgets import QVideoWidget
@@ -762,6 +762,11 @@ class MainWindow(QMainWindow):
         self.force_browser_chk.setStyleSheet("color: #555; font-size: 12px;")
         options_row.addWidget(self.force_browser_chk)
 
+        self.chk_deep_dive = QCheckBox()
+        self.chk_deep_dive.setChecked(True)
+        self.chk_deep_dive.setStyleSheet("color: #0277BD; font-weight: bold; font-size: 12px; margin-left: 12px;")
+        options_row.addWidget(self.chk_deep_dive)
+
         options_row.addStretch()
 
         self.lbl_tip = QLabel()
@@ -924,6 +929,7 @@ class MainWindow(QMainWindow):
         self.omni_input.setPlaceholderText(tr("omni_placeholder"))
         self.btn_omni.setText(tr("btn_omni"))
         self.force_browser_chk.setText(tr("chk_force_browser"))
+        self.chk_deep_dive.setText(tr("chk_deep_dive"))
         self.lbl_tip.setText(tr("lbl_tip"))
         self.lang_label.setText(tr("lbl_lang"))
 
@@ -1013,9 +1019,10 @@ class MainWindow(QMainWindow):
 
         else:
             self.append_log(tr("log_start_search", keyword=raw_text))
+            is_deep = self.chk_deep_dive.isChecked()
             def run_search_worker():
                 searcher = ResourceSearcher(log_cb=self.signals.log_signal.emit)
-                results = searcher.search_all(raw_text)
+                results = searcher.search_all(raw_text, deep_dive=is_deep)
                 self.signals.scan_finished.emit(results)
             threading.Thread(target=run_search_worker, daemon=True).start()
 
@@ -1038,6 +1045,9 @@ class MainWindow(QMainWindow):
             cat = r["category"]
             if cat in ["video", "video_stream", "audio"] and show_video:
                 filtered.append(r)
+            elif cat in ["pan_drive", "magnet"]:
+                if show_video or show_doc or show_software:
+                    filtered.append(r)
             elif cat == "software" and show_software:
                 filtered.append(r)
             elif cat in ["document", "archive", "archive_or_doc"] and show_doc:
@@ -1074,7 +1084,7 @@ class MainWindow(QMainWindow):
             size_item.setTextAlignment(Qt.AlignCenter)
             self.table.setItem(row, 3, size_item)
 
-            # 4. 快速操作列（直观的【▶ 立即播放】、【🔍 预览核验】与【⬇ 下载】）
+            # 4. 快速操作列（直观的【▶ 立即播放】、【☁️ 转存网盘】、【🧲 磁力直通】与【⬇ 下载】）
             btn_container = QWidget()
             btn_layout = QHBoxLayout(btn_container)
             btn_layout.setContentsMargins(2, 2, 2, 2)
@@ -1085,6 +1095,16 @@ class MainWindow(QMainWindow):
                 play_btn.setStyleSheet("background-color: #00C853; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
                 play_btn.clicked.connect(lambda checked, url=item["url"], t=clean_name, ref=item.get("referer", ""): self.play_item_stream(url, t, ref))
                 btn_layout.addWidget(play_btn)
+            elif item["category"] == "pan_drive":
+                pan_btn = QPushButton(tr("btn_pan"))
+                pan_btn.setStyleSheet("background-color: #7B1FA2; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
+                pan_btn.clicked.connect(lambda checked, it=item: self.open_pan_drive_item(it))
+                btn_layout.addWidget(pan_btn)
+            elif item["category"] == "magnet":
+                mag_btn = QPushButton(tr("btn_magnet"))
+                mag_btn.setStyleSheet("background-color: #E65100; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
+                mag_btn.clicked.connect(lambda checked, it=item: self.open_magnet_item(it))
+                btn_layout.addWidget(mag_btn)
             else:
                 prev_btn = QPushButton(tr("btn_preview"))
                 prev_btn.setStyleSheet("background-color: #0288D1; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
@@ -1150,6 +1170,26 @@ class MainWindow(QMainWindow):
         self.table.blockSignals(False)
         self.start_download()
 
+    def open_pan_drive_item(self, item: dict):
+        """打开网盘转存：一键复制链接与提取码，并在浏览器中自动打开网盘页面"""
+        url = item.get("url", "")
+        pwd = item.get("pwd", "")
+        clipboard = QApplication.clipboard()
+        copy_text = f"链接: {url}" + (f"\n提取码: {pwd}" if pwd else "")
+        clipboard.setText(copy_text)
+        self.append_log(f"【网盘转存】已复制网盘链接与提取码: {copy_text}")
+        QMessageBox.information(self, tr("pan_copied_title"), tr("pan_copied_msg", url=url, pwd=pwd or "无"))
+        QDesktopServices.openUrl(QUrl(url))
+
+    def open_magnet_item(self, item: dict):
+        """磁力直通：一键复制 magnet: 链接至剪贴板，并尝试唤醒本机 BT 客户端"""
+        url = item.get("url", "")
+        clipboard = QApplication.clipboard()
+        clipboard.setText(url)
+        self.append_log(f"【磁力直通】已复制磁力链接到剪贴板: {url[:60]}...")
+        QMessageBox.information(self, tr("magnet_copied_title"), tr("magnet_copied_msg"))
+        QDesktopServices.openUrl(QUrl(url))
+
     def on_table_double_clicked(self, item):
         row = item.row()
         chk_item = self.table.item(row, 0)
@@ -1163,6 +1203,10 @@ class MainWindow(QMainWindow):
             title = self.table.item(row, 1).text() if self.table.item(row, 1) else "视频"
             referer = data.get("referer", "")
             self.play_item_stream(url, title, referer)
+        elif data.get("category") == "pan_drive":
+            self.open_pan_drive_item(data)
+        elif data.get("category") == "magnet":
+            self.open_magnet_item(data)
         else:
             self.preview_resource_item(data)
 

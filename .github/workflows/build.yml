@@ -1,0 +1,44 @@
+name: Build Windows Application (Exe)
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller PyQt5 PyQtWebEngine httpx beautifulsoup4 yt-dlp requests
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --noconfirm --onefile --windowed `
+            --name="万能钥匙" `
+            --add-data="sniffer_magic.py;." `
+            --add-data="downloader.py;." `
+            --add-data="sniffer_engine.py;." `
+            --add-data="video_extractor.py;." `
+            --add-data="vip_parser.py;." `
+            --add-data="resource_searcher.py;." `
+            --add-data="player_server.py;." `
+            --add-data="assets;assets" `
+            main_ui.py
+
+      - name: Upload Windows Executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: 万能钥匙_Windows版
+          path: dist/万能钥匙.exe

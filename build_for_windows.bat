@@ -27,6 +27,7 @@ pyinstaller --noconfirm --onedir --windowed ^
     --add-data="vip_parser.py;." ^
     --add-data="resource_searcher.py;." ^
     --add-data="player_server.py;." ^
+    --add-data="i18n.py;." ^
     --add-data="assets;assets" ^
     main_ui.py
 

@@ -23,7 +23,7 @@ from PyQt5.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QCheckBox, QTableWidget,
     QTableWidgetItem, QHeaderView, QFileDialog, QTextEdit, QPlainTextEdit,
     QProgressBar, QSplitter, QGroupBox, QMessageBox, QDialog,
-    QTabWidget, QSlider, QStyle, QScrollArea, QStackedWidget
+    QTabWidget, QSlider, QStyle, QScrollArea, QStackedWidget, QComboBox
 )
 
 from PyQt5.QtWebEngineWidgets import QWebEngineView
@@ -37,6 +37,7 @@ from sniffer_engine import SnifferEngine
 from downloader import Downloader
 from resource_searcher import ResourceSearcher
 from player_server import get_proxy_stream_url
+from i18n import tr, get_i18n
 
 
 def format_size_str(size_bytes: int, is_stream=False):
@@ -51,8 +52,8 @@ def format_size_str(size_bytes: int, is_stream=False):
         else:
             return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
     elif is_stream:
-        return "高清流 (~800MB-1.2GB)"
-    return "未知大小"
+        return tr("size_hd_stream")
+    return tr("size_unknown")
 
 
 def open_media_with_system(media_source: str):
@@ -139,7 +140,7 @@ class EmbeddedPlayerDialog(QDialog):
         self.video_url = video_url
         self.referer = referer
         self.title_text = title
-        self.setWindowTitle(f"🎬 极速硬件播放: {title}")
+        self.setWindowTitle(tr("player_title", title=title))
         self.resize(1020, 640)
         self.setStyleSheet("background-color: #0d1117; color: #ffffff;")
 
@@ -157,14 +158,14 @@ class EmbeddedPlayerDialog(QDialog):
         title_lbl.setStyleSheet("color: #58a6ff; font-weight: bold; font-size: 14px;")
         top_layout.addWidget(title_lbl)
 
-        self.status_lbl = QLabel("⚡ 正在建立硬件加速流媒体通道...")
+        self.status_lbl = QLabel(tr("player_status_loading"))
         self.status_lbl.setStyleSheet("color: #00C853; font-size: 12px; margin-left: 12px;")
         top_layout.addWidget(self.status_lbl)
 
         top_layout.addStretch()
 
-        btn_sys = QPushButton("🖥 调用外部播放器 (IINA / QuickTime / VLC)")
-        btn_sys.setStyleSheet("""
+        self.btn_sys = QPushButton(tr("player_btn_sys"))
+        self.btn_sys.setStyleSheet("""
             QPushButton {
                 background-color: #238636;
                 color: #ffffff;
@@ -175,11 +176,11 @@ class EmbeddedPlayerDialog(QDialog):
             }
             QPushButton:hover { background-color: #2ea043; }
         """)
-        btn_sys.clicked.connect(self.play_with_system_direct)
-        top_layout.addWidget(btn_sys)
+        self.btn_sys.clicked.connect(self.play_with_system_direct)
+        top_layout.addWidget(self.btn_sys)
 
-        btn_copy = QPushButton("📋 复制流地址")
-        btn_copy.setStyleSheet("""
+        self.btn_copy = QPushButton(tr("player_btn_copy"))
+        self.btn_copy.setStyleSheet("""
             QPushButton {
                 background-color: #21262d;
                 color: #c9d1d9;
@@ -190,8 +191,8 @@ class EmbeddedPlayerDialog(QDialog):
             }
             QPushButton:hover { background-color: #30363d; }
         """)
-        btn_copy.clicked.connect(self.copy_url)
-        top_layout.addWidget(btn_copy)
+        self.btn_copy.clicked.connect(self.copy_url)
+        top_layout.addWidget(self.btn_copy)
 
         layout.addWidget(top_bar)
 
@@ -248,7 +249,7 @@ class EmbeddedPlayerDialog(QDialog):
         ctrl_layout.addWidget(self.vol_slider)
 
         # 全屏切换按钮
-        self.btn_fullscreen = QPushButton("⛶ 全屏")
+        self.btn_fullscreen = QPushButton(tr("player_fullscreen"))
         self.btn_fullscreen.setStyleSheet("background-color: #21262d; color: #c9d1d9; padding: 4px 8px; border: 1px solid #30363d; border-radius: 4px;")
         self.btn_fullscreen.clicked.connect(self.toggle_fullscreen)
         ctrl_layout.addWidget(self.btn_fullscreen)
@@ -318,32 +319,32 @@ class EmbeddedPlayerDialog(QDialog):
 
     def on_media_status_changed(self, status):
         if status in [QMediaPlayer.BufferedMedia, QMediaPlayer.BufferingMedia]:
-            self.status_lbl.setText("🟢 极速硬件加速解码中 (秒开出画)")
+            self.status_lbl.setText(tr("player_status_playing"))
             self.status_lbl.setStyleSheet("color: #00C853; font-size: 12px; margin-left: 12px;")
         elif status == QMediaPlayer.LoadingMedia:
-            self.status_lbl.setText("⚡ 正在建立硬件加速流媒体通道...")
+            self.status_lbl.setText(tr("player_status_loading"))
             self.status_lbl.setStyleSheet("color: #58a6ff; font-size: 12px; margin-left: 12px;")
         elif status == QMediaPlayer.EndOfMedia:
             self.btn_play.setText("▶")
 
     def on_media_error(self, error):
         err_msg = self.player.errorString()
-        self.status_lbl.setText(f"⚠ 原生解码提示: {err_msg} (可点击右上角调用外部播放器)")
+        self.status_lbl.setText(tr("player_status_error", err=err_msg))
         self.status_lbl.setStyleSheet("color: #f85149; font-size: 12px; margin-left: 12px;")
 
     def toggle_fullscreen(self):
         if self.isFullScreen():
             self.showNormal()
-            self.btn_fullscreen.setText("⛶ 全屏")
+            self.btn_fullscreen.setText(tr("player_fullscreen"))
         else:
             self.showFullScreen()
-            self.btn_fullscreen.setText("🗗 退出全屏")
+            self.btn_fullscreen.setText(tr("player_exit_fullscreen"))
 
     def copy_url(self):
         clipboard = QApplication.clipboard()
         if clipboard:
             clipboard.setText(self.video_url)
-            QMessageBox.information(self, "提示", "真实流媒体链接已复制到剪贴板！")
+            QMessageBox.information(self, tr("msg_tip"), tr("stream_link_copied"))
 
     def closeEvent(self, event):
         self.player.stop()
@@ -365,8 +366,8 @@ class ResourcePreviewDialog(QDialog):
     def __init__(self, resource_item: dict, parent=None):
         super().__init__(parent)
         self.item = resource_item
-        title = self.item.get("label", "资源详情预览")
-        self.setWindowTitle(f"🔍 资源深度核验与穿透预览: {title}")
+        title = self.item.get("label", tr("category_unknown"))
+        self.setWindowTitle(tr("preview_title", title=title))
         self.resize(920, 680)
         self.setStyleSheet("""
             QDialog { background-color: #f6f8fa; color: #24292e; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
@@ -387,7 +388,9 @@ class ResourcePreviewDialog(QDialog):
         self.lbl_title.setWordWrap(True)
         h_layout.addWidget(self.lbl_title)
 
-        meta_info = f"资源类型: {self.item.get('category', '未知')} | 格式后缀: .{self.item.get('ext', '')} | 检索来源: {self.item.get('source_engine', '全网源')}"
+        raw_cat = self.item.get('category', 'other')
+        cat_name = tr(f"cat_{raw_cat}") if f"cat_{raw_cat}" in get_i18n().get_all_keys() else tr("category_unknown")
+        meta_info = tr("preview_type", cat=cat_name, ext=self.item.get('ext', ''), source=self.item.get('source_engine', tr('source_default')))
         self.lbl_meta = QLabel(meta_info)
         self.lbl_meta.setStyleSheet("color: #586069; font-size: 12px; margin-top: 3px;")
         h_layout.addWidget(self.lbl_meta)
@@ -421,7 +424,7 @@ class ResourcePreviewDialog(QDialog):
         self.web_layout.setContentsMargins(0, 0, 0, 0)
         self.web_layout.setSpacing(6)
 
-        self.web_status_lbl = QLabel("🌐 正在建立无痕安全沙箱并实时渲染原网视口...")
+        self.web_status_lbl = QLabel(tr("preview_web_loading"))
         self.web_status_lbl.setStyleSheet("color: #0366d6; font-size: 12px; padding: 4px 8px; background-color: #f1f8ff; border: 1px solid #c8e1ff; border-radius: 4px;")
         self.web_layout.addWidget(self.web_status_lbl)
 
@@ -440,11 +443,11 @@ class ResourcePreviewDialog(QDialog):
         fb_layout = QHBoxLayout(self.found_box)
         fb_layout.setContentsMargins(10, 6, 10, 6)
 
-        self.found_lbl = QLabel("🎯 穿透发现隐藏下载直链！")
+        self.found_lbl = QLabel(tr("preview_found_link", title=title, ext=self.item.get('ext', '')))
         self.found_lbl.setStyleSheet("color: #22863a; font-weight: bold; font-size: 13px;")
         fb_layout.addWidget(self.found_lbl, 1)
 
-        self.btn_found_down = QPushButton("⬇ 立即下载穿透直链")
+        self.btn_found_down = QPushButton(tr("preview_btn_found_down"))
         self.btn_found_down.setStyleSheet("background-color: #2ea44f; color: white; font-weight: bold; padding: 5px 14px; border-radius: 4px;")
         self.btn_found_down.clicked.connect(self._on_found_download)
         fb_layout.addWidget(self.btn_found_down)
@@ -454,24 +457,24 @@ class ResourcePreviewDialog(QDialog):
         btn_bar = QHBoxLayout()
         btn_bar.setContentsMargins(0, 4, 0, 0)
 
-        self.btn_browser = QPushButton("🌐 外部浏览器打开")
+        self.btn_browser = QPushButton(tr("preview_btn_browser"))
         self.btn_browser.setStyleSheet("background-color: #ffffff; border: 1px solid #d1d5db; padding: 7px 14px; border-radius: 4px; font-size: 13px;")
         self.btn_browser.clicked.connect(lambda: open_media_with_system(self.item.get("url", "")))
         btn_bar.addWidget(self.btn_browser)
 
-        self.btn_copy = QPushButton("📋 复制链接")
+        self.btn_copy = QPushButton(tr("preview_btn_copy"))
         self.btn_copy.setStyleSheet("background-color: #ffffff; border: 1px solid #d1d5db; padding: 7px 14px; border-radius: 4px; font-size: 13px;")
         self.btn_copy.clicked.connect(self.copy_link)
         btn_bar.addWidget(self.btn_copy)
 
-        self.btn_toggle_view = QPushButton("🔄 切换视图")
+        self.btn_toggle_view = QPushButton(tr("preview_btn_toggle"))
         self.btn_toggle_view.setStyleSheet("background-color: #f1f8ff; border: 1px solid #c8e1ff; color: #0366d6; padding: 7px 14px; border-radius: 4px; font-size: 13px;")
         self.btn_toggle_view.clicked.connect(self._toggle_view_mode)
         btn_bar.addWidget(self.btn_toggle_view)
 
         btn_bar.addStretch()
 
-        self.btn_down = QPushButton("⬇ 确认正是所需，立即下载")
+        self.btn_down = QPushButton(tr("preview_btn_down"))
         self.btn_down.setStyleSheet("""
             QPushButton {
                 background-color: #2ea44f;
@@ -487,10 +490,10 @@ class ResourcePreviewDialog(QDialog):
         self.btn_down.clicked.connect(self.confirm_download)
         btn_bar.addWidget(self.btn_down)
 
-        btn_close = QPushButton("关闭")
-        btn_close.setStyleSheet("background-color: #f3f4f6; border: 1px solid #d1d5db; padding: 7px 14px; border-radius: 4px; font-size: 13px;")
-        btn_close.clicked.connect(self.close)
-        btn_bar.addWidget(btn_close)
+        self.btn_close = QPushButton(tr("preview_btn_close"))
+        self.btn_close.setStyleSheet("background-color: #f3f4f6; border: 1px solid #d1d5db; padding: 7px 14px; border-radius: 4px; font-size: 13px;")
+        self.btn_close.clicked.connect(self.close)
+        btn_bar.addWidget(self.btn_close)
 
         layout.addLayout(btn_bar)
 
@@ -509,7 +512,7 @@ class ResourcePreviewDialog(QDialog):
         # 1. 如果有明确样张大图，优先展示大图
         if p_img or cat == "image":
             self.stack.setCurrentIndex(0)
-            self.img_label.setText("⏳ 正在载入高清资源样张大图...")
+            self.img_label.setText(tr("preview_img_loading"))
             target_img_url = p_img if p_img else res_url
             self._fetch_image_async(target_img_url)
 
@@ -517,7 +520,7 @@ class ResourcePreviewDialog(QDialog):
         elif res_url.startswith("http://") or res_url.startswith("https://"):
             # 切换到全景浏览器渲染视口
             self.stack.setCurrentIndex(1)
-            self.web_status_lbl.setText(f"🌐 正在内嵌渲染目标网页环境: {res_url}")
+            self.web_status_lbl.setText(tr("preview_rendering_target", url=res_url))
             self.web_view.setUrl(QUrl(res_url))
 
             # 同时启动后台多层穿透跟踪（追踪多层重定向与真实隐藏下载附件）
@@ -525,7 +528,7 @@ class ResourcePreviewDialog(QDialog):
 
         else:
             self.stack.setCurrentIndex(0)
-            self.img_label.setText(f"📄 资源地址: {res_url}\n(可直接点击下方【立即下载】)")
+            self.img_label.setText(tr("preview_direct_url_tip", url=res_url))
 
     def _fetch_image_async(self, img_url: str):
         def worker():
@@ -590,7 +593,8 @@ class ResourcePreviewDialog(QDialog):
         if found_list:
             top_file = found_list[0]
             self._best_download_item = top_file
-            self.found_lbl.setText(f"🎯 自动穿透提取出真实文件直链: 《{top_file.get('label', '附件包')}》 (.{top_file.get('ext')})")
+            self.found_lbl.setText(tr("preview_found_link", title=top_file.get("label", tr("attachment_pkg")), ext=top_file.get("ext", "")))
+            self.web_status_lbl.setText(tr("preview_found_status", count=len(found_list)))
             self.found_box.setVisible(True)
             self.web_status_lbl.setText(f"✨ 穿透引擎已为您在目标页面中锁定 {len(found_list)} 个直出文件，可直接点击下方绿钮高速下载！")
 
@@ -659,11 +663,11 @@ class ResourcePreviewDialog(QDialog):
         if res_url.startswith("http://") or res_url.startswith("https://"):
             self.stack.setCurrentIndex(1)
         else:
-            self.img_label.setText("📄 资源样张预览已生成 (可直接点击下方【立即下载/打开】获取原件)")
+            self.img_label.setText(tr("preview_img_tip"))
 
     def copy_link(self):
         QApplication.clipboard().setText(self._best_download_item.get("url", ""))
-        QMessageBox.information(self, "提示", "资源直链已成功复制到剪贴板！")
+        QMessageBox.information(self, tr("msg_tip"), tr("preview_link_copied"))
 
     def confirm_download(self):
         self.download_requested.emit(self._best_download_item)
@@ -696,6 +700,8 @@ class MainWindow(QMainWindow):
         os.makedirs(self.save_dir, exist_ok=True)
 
         self.init_ui()
+        get_i18n().register_listener(self.update_ui_texts)
+        self.update_ui_texts()
 
     def init_ui(self):
         central_widget = QWidget()
@@ -703,8 +709,8 @@ class MainWindow(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
 
         # 1. 顶部“万能钥匙”极速接入控制台
-        omni_group = QGroupBox("🔑 万能钥匙极速接入（全自动智能识别：网址解析 / 影视搜剧 / 协议嗅探）")
-        omni_group.setStyleSheet("""
+        self.omni_group = QGroupBox()
+        self.omni_group.setStyleSheet("""
             QGroupBox {
                 font-weight: bold;
                 border: 2px solid #2196F3;
@@ -720,16 +726,15 @@ class MainWindow(QMainWindow):
                 color: #1976D2;
             }
         """)
-        omni_layout = QVBoxLayout(omni_group)
+        omni_layout = QVBoxLayout(self.omni_group)
 
         input_row = QHBoxLayout()
         self.omni_input = ChineseFriendlyLineEdit()
         self.omni_input.setFixedHeight(38)
-        self.omni_input.setPlaceholderText("💡 随意输入：网页URL（如爱优腾/B站/各类影视站）、影视剧名称（如流浪地球/狂飙）、或磁力magnet链接...")
         self.omni_input.returnPressed.connect(self.start_universal_action)
         input_row.addWidget(self.omni_input)
 
-        self.btn_omni = QPushButton("⚡ 一键破译 / 极速搜索")
+        self.btn_omni = QPushButton()
         self.btn_omni.setFixedHeight(38)
         self.btn_omni.setStyleSheet("""
             QPushButton {
@@ -753,67 +758,100 @@ class MainWindow(QMainWindow):
 
         # 辅助功能与状态选项
         options_row = QHBoxLayout()
-        self.force_browser_chk = QCheckBox("强力穿透模式 (遇到特种 Cloudflare/极难防护站时勾选)")
+        self.force_browser_chk = QCheckBox()
         self.force_browser_chk.setStyleSheet("color: #555; font-size: 12px;")
         options_row.addWidget(self.force_browser_chk)
 
         options_row.addStretch()
 
-        self.lbl_tip = QLabel("✨ 智能路由：自动判断网页或剧名，0 学习成本，内置秒级全网聚合节点与本地流媒体代理")
+        self.lbl_tip = QLabel()
         self.lbl_tip.setStyleSheet("color: #666; font-size: 12px; font-style: italic;")
         options_row.addWidget(self.lbl_tip)
 
+        # 全局语言即时切换下拉框
+        self.lang_label = QLabel()
+        self.lang_label.setStyleSheet("color: #333; font-weight: bold; font-size: 12px; margin-left: 12px;")
+        options_row.addWidget(self.lang_label)
+
+        self.lang_combo = QComboBox()
+        self.lang_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #ffffff;
+                color: #1976D2;
+                font-weight: bold;
+                border: 1.5px solid #2196F3;
+                border-radius: 4px;
+                padding: 3px 10px;
+                font-size: 12px;
+                min-width: 110px;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #ffffff;
+                selection-background-color: #e3f2fd;
+                selection-color: #1976D2;
+            }
+        """)
+        for code_item, name_item in get_i18n().get_supported_languages():
+            self.lang_combo.addItem(name_item, code_item)
+        curr_code = get_i18n().current_lang
+        idx = self.lang_combo.findData(curr_code)
+        if idx >= 0:
+            self.lang_combo.setCurrentIndex(idx)
+        self.lang_combo.currentIndexChanged.connect(self.on_language_changed)
+        options_row.addWidget(self.lang_combo)
+
         omni_layout.addLayout(options_row)
-        main_layout.addWidget(omni_group)
+        main_layout.addWidget(self.omni_group)
 
 
         # 2. 中部主体（分类筛选 + 资源表格）
         splitter = QSplitter(Qt.Horizontal)
 
         # 左侧筛选
-        filter_group = QGroupBox("分类过滤")
-        filter_layout = QVBoxLayout(filter_group)
+        self.filter_group = QGroupBox()
+        filter_layout = QVBoxLayout(self.filter_group)
 
-        self.chk_video = QCheckBox("🎬 影视流媒体 (在线秒播)")
+        self.chk_video = QCheckBox()
         self.chk_video.setChecked(True)
         self.chk_video.stateChanged.connect(self.filter_table)
         filter_layout.addWidget(self.chk_video)
 
-        self.chk_software = QCheckBox("💻 软件应用 (安装包/工具)")
+        self.chk_software = QCheckBox()
         self.chk_software.setChecked(True)
         self.chk_software.stateChanged.connect(self.filter_table)
         filter_layout.addWidget(self.chk_software)
 
-        self.chk_doc = QCheckBox("📄 办公文档 (简历/合同/PPT)")
+        self.chk_doc = QCheckBox()
         self.chk_doc.setChecked(True)
         self.chk_doc.stateChanged.connect(self.filter_table)
         filter_layout.addWidget(self.chk_doc)
 
-        self.chk_image = QCheckBox("🖼 图像相册 (海报/壁纸)")
+        self.chk_image = QCheckBox()
         self.chk_image.setChecked(True)
         self.chk_image.stateChanged.connect(self.filter_table)
         filter_layout.addWidget(self.chk_image)
 
-
         filter_layout.addStretch()
 
-        self.btn_select_all = QPushButton("全选显示项")
+        self.btn_select_all = QPushButton()
         self.btn_select_all.clicked.connect(self.select_all_items)
         filter_layout.addWidget(self.btn_select_all)
 
-        self.btn_deselect_all = QPushButton("取消全选")
+        self.btn_deselect_all = QPushButton()
         self.btn_deselect_all.clicked.connect(self.deselect_all_items)
         filter_layout.addWidget(self.btn_deselect_all)
 
-        splitter.addWidget(filter_group)
+        splitter.addWidget(self.filter_group)
 
         # 右侧表格
-        table_group = QGroupBox("已整理资源列表 (点击绿色按钮立即秒播)")
-        table_layout = QVBoxLayout(table_group)
+        self.table_group = QGroupBox()
+        table_layout = QVBoxLayout(self.table_group)
 
         self.table = QTableWidget()
         self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(["勾选", "资源名称 / 剧集", "类型说明", "资源大小", "快速操作", "资源链接"])
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
@@ -823,35 +861,36 @@ class MainWindow(QMainWindow):
         table_layout.addWidget(self.table)
 
         # 表格下方实时统计标签
-        self.stats_label = QLabel("📊 统计信息: 当前共 0 个资源 | 已选择 0 项 | 预估总大小: 0 MB")
+        self.stats_label = QLabel()
         self.stats_label.setStyleSheet("color: #0366d6; font-weight: bold; padding: 4px;")
         table_layout.addWidget(self.stats_label)
 
-        splitter.addWidget(table_group)
+        splitter.addWidget(self.table_group)
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 4)
 
         main_layout.addWidget(splitter, 4)
 
         # 3. 底部下载与路径设置
-        bottom_group = QGroupBox("下载与本地文件整理")
-        bottom_layout = QVBoxLayout(bottom_group)
+        self.bottom_group = QGroupBox()
+        bottom_layout = QVBoxLayout(self.bottom_group)
 
         path_layout = QHBoxLayout()
-        path_layout.addWidget(QLabel("保存目录:"))
+        self.lbl_save_dir = QLabel()
+        path_layout.addWidget(self.lbl_save_dir)
         self.path_display = QLineEdit(self.save_dir)
         self.path_display.setReadOnly(True)
         path_layout.addWidget(self.path_display)
 
-        self.btn_change_path = QPushButton("选择文件夹")
+        self.btn_change_path = QPushButton()
         self.btn_change_path.clicked.connect(self.choose_save_dir)
         path_layout.addWidget(self.btn_change_path)
 
-        self.btn_open_folder = QPushButton("📂 打开下载文件夹")
+        self.btn_open_folder = QPushButton()
         self.btn_open_folder.clicked.connect(self.open_download_folder)
         path_layout.addWidget(self.btn_open_folder)
 
-        self.btn_start_download = QPushButton("⬇ 批量下载勾选资源并合成完整MP4")
+        self.btn_start_download = QPushButton()
         self.btn_start_download.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 6px 14px;")
         self.btn_start_download.clicked.connect(self.start_download)
         path_layout.addWidget(self.btn_start_download)
@@ -862,16 +901,59 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         bottom_layout.addWidget(self.progress_bar)
 
-        main_layout.addWidget(bottom_group)
+        main_layout.addWidget(self.bottom_group)
 
         # 4. 实时日志区域
-        log_group = QGroupBox("运行日志")
-        log_layout = QVBoxLayout(log_group)
+        self.log_group = QGroupBox()
+        log_layout = QVBoxLayout(self.log_group)
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
         log_layout.addWidget(self.log_text)
 
-        main_layout.addWidget(log_group, 2)
+        main_layout.addWidget(self.log_group, 2)
+
+    def on_language_changed(self, index):
+        selected_code = self.lang_combo.itemData(index)
+        if selected_code:
+            get_i18n().set_language(selected_code)
+
+    def update_ui_texts(self):
+        """核心全局全方位多语言热切换刷新引擎：0死角无残留同步翻译"""
+        self.setWindowTitle(tr("app_title"))
+        self.omni_group.setTitle(tr("omni_title"))
+        self.omni_input.setPlaceholderText(tr("omni_placeholder"))
+        self.btn_omni.setText(tr("btn_omni"))
+        self.force_browser_chk.setText(tr("chk_force_browser"))
+        self.lbl_tip.setText(tr("lbl_tip"))
+        self.lang_label.setText(tr("lbl_lang"))
+
+        self.filter_group.setTitle(tr("filter_group"))
+        self.chk_video.setText(tr("chk_video"))
+        self.chk_software.setText(tr("chk_software"))
+        self.chk_doc.setText(tr("chk_doc"))
+        self.chk_image.setText(tr("chk_image"))
+        self.btn_select_all.setText(tr("btn_select_all"))
+        self.btn_deselect_all.setText(tr("btn_deselect_all"))
+
+        self.table_group.setTitle(tr("table_group"))
+        self.table.setHorizontalHeaderLabels([
+            tr("col_check"),
+            tr("col_name"),
+            tr("col_type"),
+            tr("col_size"),
+            tr("col_action"),
+            tr("col_url")
+        ])
+
+        self.bottom_group.setTitle(tr("bottom_group"))
+        self.lbl_save_dir.setText(tr("lbl_save_dir"))
+        self.btn_change_path.setText(tr("btn_change_dir"))
+        self.btn_open_folder.setText(tr("btn_open_dir"))
+        self.btn_start_download.setText(tr("btn_start_download"))
+        self.log_group.setTitle(tr("log_group"))
+
+        # 刷新表格内部已生成的行文本与统计信息
+        self.filter_table()
 
     def append_log(self, text: str):
         self.log_text.append(text)
@@ -880,7 +962,7 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(val)
 
     def choose_save_dir(self):
-        dir_path = QFileDialog.getExistingDirectory(self, "选择保存目录", self.save_dir)
+        dir_path = QFileDialog.getExistingDirectory(self, tr("dialog_choose_dir"), self.save_dir)
         if dir_path:
             self.save_dir = dir_path
             self.path_display.setText(dir_path)
@@ -893,7 +975,7 @@ class MainWindow(QMainWindow):
     def start_universal_action(self):
         raw_text = self.omni_input.text().strip()
         if not raw_text:
-            QMessageBox.warning(self, "提示", "请输入网址、电影名称或磁力链接！")
+            QMessageBox.warning(self, tr("msg_tip"), tr("msg_input_empty"))
             return
 
         self.btn_omni.setEnabled(False)
@@ -907,7 +989,7 @@ class MainWindow(QMainWindow):
         force_cdp = self.force_browser_chk.isChecked()
 
         if is_url:
-            self.append_log(f"=== [万能钥匙] 识别为网页目标，启动全息深度嗅探: {raw_text} ===")
+            self.append_log(tr("log_start_url", url=raw_text))
             def run_url_worker():
                 engine = SnifferEngine(log_cb=self.signals.log_signal.emit)
                 if force_cdp:
@@ -918,7 +1000,7 @@ class MainWindow(QMainWindow):
             threading.Thread(target=run_url_worker, daemon=True).start()
 
         elif is_p2p:
-            self.append_log(f"=== [万能钥匙] 识别为 P2P / 磁力协议，正在直链载入 ===")
+            self.append_log(tr("log_start_p2p"))
             p2p_item = [{
                 "url": raw_text,
                 "category": "document",
@@ -930,7 +1012,7 @@ class MainWindow(QMainWindow):
             self.signals.scan_finished.emit(p2p_item)
 
         else:
-            self.append_log(f"=== [万能钥匙] 识别为全网资源关键词，启动矩阵并发检索: 《{raw_text}》 ===")
+            self.append_log(tr("log_start_search", keyword=raw_text))
             def run_search_worker():
                 searcher = ResourceSearcher(log_cb=self.signals.log_signal.emit)
                 results = searcher.search_all(raw_text)
@@ -942,7 +1024,7 @@ class MainWindow(QMainWindow):
         self.all_resources = results
 
         self.filter_table()
-        self.append_log(f"整理完成！共整理出 {len(results)} 条可用资源。")
+        self.append_log(tr("log_scan_done", count=len(results)))
 
 
     def filter_table(self):
@@ -979,14 +1061,9 @@ class MainWindow(QMainWindow):
             self.table.setItem(row, 1, QTableWidgetItem(clean_name))
 
             # 2. 类型说明
-            cat_desc = {
-                "video": "🎬 高清视频",
-                "video_stream": "🎬 在线影视 (秒开即播/可下载)",
-                "software": f"💻 软件应用 (.{item.get('ext', 'exe')})",
-                "document": f"📄 办公文档 (.{item.get('ext', 'doc')})",
-                "audio": "🎵 音频资源",
-                "image": "🖼 图像海报"
-            }.get(item["category"], "其他资源")
+            raw_c = item.get("category", "")
+            ext_suffix = f" (.{item.get('ext', '')})" if item.get('ext') and raw_c in ['software', 'document'] else ""
+            cat_desc = tr(f"cat_{raw_c}") + ext_suffix if f"cat_{raw_c}" in get_i18n().get_all_keys() else tr("cat_other")
             self.table.setItem(row, 2, QTableWidgetItem(cat_desc))
 
             # 3. 资源大小展示
@@ -1004,17 +1081,17 @@ class MainWindow(QMainWindow):
             btn_layout.setSpacing(6)
 
             if item["category"] in ["video", "video_stream", "audio"]:
-                play_btn = QPushButton("▶ 播放")
+                play_btn = QPushButton(tr("btn_play"))
                 play_btn.setStyleSheet("background-color: #00C853; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
                 play_btn.clicked.connect(lambda checked, url=item["url"], t=clean_name, ref=item.get("referer", ""): self.play_item_stream(url, t, ref))
                 btn_layout.addWidget(play_btn)
             else:
-                prev_btn = QPushButton("🔍 预览")
+                prev_btn = QPushButton(tr("btn_preview"))
                 prev_btn.setStyleSheet("background-color: #0288D1; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
                 prev_btn.clicked.connect(lambda checked, it=item: self.preview_resource_item(it))
                 btn_layout.addWidget(prev_btn)
 
-                down_single_btn = QPushButton("⬇ 下载")
+                down_single_btn = QPushButton(tr("btn_download_single"))
                 down_single_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
                 down_single_btn.clicked.connect(lambda checked, it=item: self.download_single_item(it))
                 btn_layout.addWidget(down_single_btn)
@@ -1046,19 +1123,17 @@ class MainWindow(QMainWindow):
                         total_bytes += 900 * 1024 * 1024
 
         size_text = format_size_str(total_bytes, is_stream=False)
-        self.stats_label.setText(
-            f"📊 统计信息: 当前列表共 {total_rows} 项 | 已选择 {selected_count} 项 | 选中预估总大小: {size_text}"
-        )
+        self.stats_label.setText(tr("stats_template", total=total_rows, selected=selected_count, size=size_text))
 
     def play_item_stream(self, stream_url: str, title: str, referer: str = ""):
         """用户点击【▶ 立即播放】或双击视频行：0.01秒弹出播放窗口并开启硬件加速"""
-        self.append_log(f"正在唤醒极速播放窗口: {title}")
+        self.append_log(tr("log_open_player", title=title))
         dialog = EmbeddedPlayerDialog(stream_url, title=title, referer=referer, parent=self)
         dialog.exec_()
 
     def preview_resource_item(self, item: dict):
         """弹出资源沉浸式预览窗口（大图样张 / 软件信息），确认无误后再一键下载"""
-        self.append_log(f"正在打开资源预览: {item.get('label', '')}")
+        self.append_log(tr("log_open_preview", title=item.get("label", "")))
         diag = ResourcePreviewDialog(item, parent=self)
         diag.download_requested.connect(self.download_single_item)
         diag.exec_()
@@ -1118,7 +1193,7 @@ class MainWindow(QMainWindow):
                 selected.append(item.data(Qt.UserRole))
 
         if not selected:
-            QMessageBox.information(self, "提示", "请先勾选想要下载的影视剧！")
+            QMessageBox.information(self, tr("msg_tip"), tr("msg_no_selected"))
             return
 
         self.btn_start_download.setEnabled(False)
@@ -1156,20 +1231,20 @@ class MainWindow(QMainWindow):
     def on_download_finished(self, downloaded_videos):
         self.btn_start_download.setEnabled(True)
         self.progress_bar.setValue(100)
-        self.append_log("=== 下载与合成已完成，已自动整理为标准MP4文件！===")
+        self.append_log(tr("log_download_done"))
 
         if downloaded_videos:
             first_vid = downloaded_videos[0]
             play_reply = QMessageBox.question(
                 self,
-                "下载完成",
-                f"已成功将所有切片合成整理为完整可播放视频：\n{os.path.basename(first_vid)}\n\n是否立即打开观看？",
+                tr("msg_download_done"),
+                tr("msg_download_done_video", file=os.path.basename(first_vid)),
                 QMessageBox.Yes | QMessageBox.No
             )
             if play_reply == QMessageBox.Yes:
                 open_media_with_system(first_vid)
         else:
-            QMessageBox.information(self, "完成", f"所选资源已下载完成，保存目录：\n{self.save_dir}")
+            QMessageBox.information(self, tr("msg_success"), tr("msg_download_done_general", dir=self.save_dir))
 
     def showEvent(self, event):
         super().showEvent(event)

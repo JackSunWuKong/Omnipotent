@@ -40,14 +40,62 @@ class ResourceSearcher:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
         }
 
+    def resolve_multilingual_aliases(self, keyword: str):
+        """
+        智能多语言片名自动互译与别名联想：
+        当用户输入英文/外文片名（如 Oppenheimer、Avatar、Inception）时，
+        毫秒级自动匹配中文官方译名（如 奥本海默、阿凡达、盗梦空间），
+        实现 0 学习成本、中英文双向互通秒搜！
+        """
+        # 如果包含中文字符，直接以原关键词为主
+        if any('\u4e00' <= char <= '\u9fa5' for char in keyword):
+            return [keyword]
+
+        candidates = [keyword]
+        # 1. 豆瓣即时联想 API
+        try:
+            url = f"https://movie.douban.com/j/subject_suggest?q={quote(keyword)}"
+            with httpx.Client(headers=self.headers, timeout=2.0, verify=False) as c:
+                r = c.get(url)
+                if r.status_code == 200:
+                    for item in r.json():
+                        t = item.get("title")
+                        if t and any('\u4e00' <= ch <= '\u9fa5' for ch in t):
+                            clean = t.split()[0].replace("·", "")
+                            if clean and clean not in candidates:
+                                candidates.append(clean)
+        except Exception:
+            pass
+
+        # 2. 维基多语言交叉索引
+        try:
+            for term in [keyword, f"{keyword} (film)"]:
+                wiki_url = f"https://en.wikipedia.org/w/api.php?action=query&prop=langlinks&titles={quote(term)}&lllang=zh&format=json"
+                with httpx.Client(headers=self.headers, timeout=2.0, verify=False) as c:
+                    r = c.get(wiki_url)
+                    pages = r.json().get("query", {}).get("pages", {})
+                    for pid, p in pages.items():
+                        for ll in p.get("langlinks", []):
+                            clean_t = ll.get("*", "").split("(")[0].strip()
+                            if clean_t and clean_t not in candidates:
+                                candidates.append(clean_t)
+        except Exception:
+            pass
+
+        return candidates
+
     def search_videos(self, keyword: str):
+        search_terms = self.resolve_multilingual_aliases(keyword)
+        if len(search_terms) > 1:
+            self.log_cb(f"【智能片名互译】已识别外文片名 《{keyword}》，自动扩展译名: {', '.join(search_terms[1:])}")
+
         self.log_cb(f"正在全网影视云矩阵 ({len(VIDEO_SEARCH_APIS)} 个核心节点) 并发检索: 《{keyword}》...")
         results = []
         seen_urls = set()
 
-        def fetch_api(api_info):
+        def fetch_api(api_info, term):
             name = api_info["name"]
-            req_url = f"{api_info['url']}{quote(keyword)}"
+            req_url = f"{api_info['url']}{quote(term)}"
             try:
                 with httpx.Client(headers=self.headers, timeout=5.0, verify=False, follow_redirects=True) as client:
                     resp = client.get(req_url)
@@ -59,8 +107,13 @@ class ResourceSearcher:
                 pass
             return name, []
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(VIDEO_SEARCH_APIS)) as executor:
-            future_to_api = {executor.submit(fetch_api, api): api["name"] for api in VIDEO_SEARCH_APIS}
+        tasks = []
+        for term in search_terms:
+            for api in VIDEO_SEARCH_APIS:
+                tasks.append((api, term))
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(20, len(tasks))) as executor:
+            future_to_api = {executor.submit(fetch_api, api, term): api["name"] for api, term in tasks}
             for future in concurrent.futures.as_completed(future_to_api):
                 api_name, items = future.result()
                 if items:

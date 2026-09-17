@@ -1388,9 +1388,16 @@ class MainWindow(QMainWindow):
         else:
             self.append_log(tr("log_start_search", keyword=raw_text))
             is_deep = self.chk_deep_dive.isChecked()
+            # 获取用户勾选的专有分类（当用户专门勾选小说或单一分类时精准定向）
+            cat_hint = None
+            if self.chk_novel.isChecked() and not self.chk_video.isChecked() and not self.chk_software.isChecked() and not self.chk_doc.isChecked():
+                cat_hint = "novel"
+            elif self.chk_novel.isChecked() and not self.chk_video.isChecked():
+                cat_hint = "novel"
+
             def run_search_worker():
                 searcher = ResourceSearcher(log_cb=self.signals.log_signal.emit)
-                results = searcher.search_all(raw_text, deep_dive=is_deep)
+                results = searcher.search_all(raw_text, deep_dive=is_deep, category_hint=cat_hint)
                 self.signals.scan_finished.emit(results)
             threading.Thread(target=run_search_worker, daemon=True).start()
 
@@ -1416,7 +1423,11 @@ class MainWindow(QMainWindow):
                 filtered.append(r)
             elif cat == "novel" and show_novel:
                 filtered.append(r)
-            elif cat in ["pan_drive", "magnet"]:
+            elif cat == "magnet":
+                # 磁力链通常为影视或大文件BT，只在勾选影视或软件文档时呈现，绝对不污染小说在线阅读
+                if show_video or show_doc or show_software:
+                    filtered.append(r)
+            elif cat == "pan_drive":
                 if show_video or show_doc or show_software or show_novel:
                     filtered.append(r)
             elif cat == "software" and show_software:

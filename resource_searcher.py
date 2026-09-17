@@ -692,8 +692,22 @@ class ResourceSearcher:
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             f_online = executor.submit(fetch_online_novel)
             f_pan = executor.submit(fetch_pan_novel)
-            results.extend(f_online.result())
-            results.extend(f_pan.result())
+            online_res = f_online.result()
+            pan_res = f_pan.result()
+
+            # 精准度排序：将书名完全匹配或高度匹配的放最前
+            kw_clean = keyword.strip()
+            def match_score(it):
+                lbl = it.get("label", "")
+                if f"《{kw_clean}》" in lbl:
+                    return 0 # 完全匹配
+                elif kw_clean in lbl:
+                    return 1 # 包含匹配
+                return 2
+
+            online_res.sort(key=match_score)
+            results.extend(online_res)
+            results.extend(pan_res)
 
         self.log_cb(f"小说资源深度探索完毕！共捕获到 {len(results)} 部书籍（含在线阅读与网盘精校全本）。")
         return results
@@ -773,7 +787,7 @@ class ResourceSearcher:
                 pass
         return "", "正文加载失败，请检查网络或点击重新加载。"
 
-    def search_all(self, keyword: str, deep_dive: bool = False):
+    def search_all(self, keyword: str, deep_dive: bool = False, category_hint: str = None):
         """
         全能全景搜索：智能识别关键词意图，全方位覆盖：
         1. 电子小说 / 全本书籍 / 在线阅读 / 章节目录
@@ -784,6 +798,13 @@ class ResourceSearcher:
         """
         if deep_dive:
             return self.search_deep_dive(keyword)
+
+        # 1. 如果前端明确指定或勾选了“电子小说”专属分类
+        if category_hint == "novel":
+            self.log_cb(f"【OmniFinder】已定向进入小说全本模式，检索在线秒读与网盘全本书籍...")
+            clean_book_name = re.sub(r'(?:小说|txt|epub|全本|完本|精校|无删减|下载)', '', keyword, flags=re.IGNORECASE).strip()
+            book_query = clean_book_name if clean_book_name else keyword
+            return self.search_novels(book_query)
 
         # 智能检测是否输入的是剧情描述
         clue_indicators = ["被困", "迷宫", "杀手", "失忆", "特工", "反杀", "互换", "荒岛", "讲的是", "解说", "小帅"]
@@ -802,11 +823,9 @@ class ResourceSearcher:
         results = []
         if is_novel_intent:
             self.log_cb(f"【OmniFinder】检测到小说/书籍意图，优先检索全网小说与TXT/EPUB精校资源池...")
-            # 去除冗余后缀词提高命中率
             clean_book_name = re.sub(r'(?:小说|txt|epub|全本|完本|精校|无删减|下载)', '', keyword, flags=re.IGNORECASE).strip()
             book_query = clean_book_name if clean_book_name else keyword
             results.extend(self.search_novels(book_query))
-            # 附带检索网盘与影视
             results.extend(self.search_pan_drives(keyword))
         elif is_doc_intent:
             self.log_cb(f"【OmniFinder】检测到办公/文档/素材意图，优先检索全国模板库与文档资源...")
@@ -819,15 +838,23 @@ class ResourceSearcher:
             video_results = self.search_videos(keyword)
             results.extend(video_results)
         else:
-            # 综合意图：优先搜索影视矩阵
-            video_results = self.search_videos(keyword)
-            results.extend(video_results)
-            # 若常规源搜索结果较少，自动深潜补充小说、网盘与磁力资源！
+            # 综合意图：并发检索影视与小说在线库（确保搜索如《凡人修仙传》、《斗破苍穹》等知名小说时，在线阅读源同样秒出并置顶！）
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                f_novel = executor.submit(self.search_novels, keyword)
+                f_video = executor.submit(self.search_videos, keyword)
+                novel_res = f_novel.result()
+                video_res = f_video.result()
+
+            # 如果命中小说，优先将在线阅读源展示在最前方！
+            if novel_res:
+                results.extend(novel_res)
+            results.extend(video_res)
+
+            # 若常规源搜索结果较少，自动深潜补充网盘与磁力资源！
             if len(results) < 3:
-                self.log_cb(f"【智能深潜补充】常规片源较少，自动调动网盘暗搜与全球磁力补强...")
+                self.log_cb(f"【智能深潜补充】常规结果较少，自动调动网盘暗搜与全球磁力补强...")
                 results.extend(self.search_pan_drives(keyword))
                 results.extend(self.search_magnets(keyword))
-                results.extend(self.search_novels(keyword))
             if len(results) < 5:
                 results.extend(self.search_software(keyword))
                 results.extend(self.search_documents(keyword))

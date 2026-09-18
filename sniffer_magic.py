@@ -125,11 +125,16 @@ def identify_resource(content_type: str, url: str, sample_bytes: bytes = None):
 
     # 3. 回退通过 URL 特征与扩展名判定
     if url.lower().startswith("magnet:"):
-        return "document", "magnet"
+        return "magnet", "magnet"
     if url.lower().startswith("ed2k://"):
         return "document", "ed2k"
     if url.lower().startswith("thunder://"):
         return "document", "thunder"
+
+    # 网盘转存链接识别
+    pan_domains = ["pan.quark.cn", "pan.baidu.com", "123pan.com", "lanzou", "ctfile.com", "aliyundrive.com", "drive.uc.cn", "mypikpak.com"]
+    if any(pd in url.lower() for pd in pan_domains):
+        return "pan_drive", "pan"
 
     url_lower = url.lower().split("?")[0]
     for ext in [".m3u8", ".mp4", ".flv", ".f4v", ".webm", ".avi", ".mkv", ".mov", ".wmv", ".rmvb", ".rm", ".3gp", ".asf", ".m4v", ".ts", ".swf"]:
@@ -139,6 +144,10 @@ def identify_resource(content_type: str, url: str, sample_bytes: bytes = None):
     for ext in [".mp3", ".wav", ".aac", ".ogg", ".flac", ".m4a", ".wma", ".ape"]:
         if url_lower.endswith(ext):
             return "audio", ext.strip(".")
+
+    for ext in [".exe", ".dmg", ".pkg", ".apk", ".msi", ".deb", ".rpm", ".ipa", ".appimage"]:
+        if url_lower.endswith(ext):
+            return "software", ext.strip(".")
 
     for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".svg", ".ico", ".tiff"]:
         if url_lower.endswith(ext):

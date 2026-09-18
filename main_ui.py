@@ -1467,9 +1467,11 @@ class MainWindow(QMainWindow):
         self.btn_omni.setEnabled(True)
         self.all_resources = results
 
-        # 智能意图与分类聚焦：若用户没有特意单独只勾某类，且检索出的置顶核心资源为“电子小说在线阅读”，智能自动切换左侧筛选聚焦展示小说
+        # 智能意图与分类聚焦：
         active_cats_count = sum([self.chk_video.isChecked(), self.chk_novel.isChecked(), self.chk_software.isChecked(), self.chk_doc.isChecked(), self.chk_image.isChecked()])
         has_online_novel = any(r.get("category") == "novel" and r.get("sub_category") == "novel_online" for r in results[:3])
+        has_apps = any(r.get("category") in ["software", "pan_drive"] for r in results[:5])
+
         if has_online_novel and active_cats_count > 1:
             # 自动聚焦于小说分类，带来极致智能无缝的阅读体验
             self.chk_video.blockSignals(True)
@@ -1482,6 +1484,25 @@ class MainWindow(QMainWindow):
             self.chk_video.setChecked(False)
             self.chk_software.setChecked(False)
             self.chk_doc.setChecked(False)
+            self.chk_image.setChecked(False)
+
+            self.chk_video.blockSignals(False)
+            self.chk_novel.blockSignals(False)
+            self.chk_software.blockSignals(False)
+            self.chk_doc.blockSignals(False)
+            self.chk_image.blockSignals(False)
+        elif has_apps and active_cats_count > 1 and not has_online_novel:
+            # 自动聚焦于软件与网盘安装包分类，过滤掉大量背景图片海报干扰
+            self.chk_video.blockSignals(True)
+            self.chk_novel.blockSignals(True)
+            self.chk_software.blockSignals(True)
+            self.chk_doc.blockSignals(True)
+            self.chk_image.blockSignals(True)
+
+            self.chk_software.setChecked(True)
+            self.chk_doc.setChecked(False)
+            self.chk_video.setChecked(False)
+            self.chk_novel.setChecked(False)
             self.chk_image.setChecked(False)
 
             self.chk_video.blockSignals(False)

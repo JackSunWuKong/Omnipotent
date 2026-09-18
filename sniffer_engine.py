@@ -146,8 +146,15 @@ class SnifferEngine:
         """精准检测资源类型与大小（融合指纹魔数穿透伪装）"""
         url_lower = url.lower().split("?")[0]
         # P2P 或特定协议
-        if url.lower().startswith("magnet:") or url.lower().startswith("ed2k://") or url.lower().startswith("thunder://"):
+        if url.lower().startswith("magnet:"):
+            return "magnet", "magnet", 0
+        if url.lower().startswith("ed2k://") or url.lower().startswith("thunder://"):
             return "document", url.split(":")[0], 0
+
+        # 网盘转存链接
+        pan_domains = ["pan.quark.cn", "pan.baidu.com", "123pan.com", "lanzou", "ctfile.com", "aliyundrive.com", "drive.uc.cn", "mypikpak.com"]
+        if any(pd in url.lower() for pd in pan_domains):
+            return "pan_drive", "pan", 0
 
         for ext in [".m3u8", ".mp4", ".flv", ".webm", ".avi", ".mkv", ".wmv", ".rmvb", ".mov"]:
             if url_lower.endswith(ext):
@@ -155,15 +162,15 @@ class SnifferEngine:
         for ext in [".mp3", ".wav", ".aac", ".flac", ".ogg", ".m4a", ".wma"]:
             if url_lower.endswith(ext):
                 return "audio", ext.strip("."), 0
-        for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg", ".bmp", ".ico"]:
+        for ext in [".exe", ".dmg", ".pkg", ".apk", ".msi", ".deb", ".rpm", ".iso", ".ipa", ".appimage"]:
             if url_lower.endswith(ext):
-                return "image", ext.strip("."), 0
+                return "software", ext.strip("."), 0
         for ext in [".pdf", ".docx", ".xlsx", ".pptx", ".doc", ".xls", ".zip", ".rar", ".7z", ".torrent"]:
             if url_lower.endswith(ext):
                 return "document", ext.strip("."), 0
-        for ext in [".exe", ".dmg", ".pkg", ".apk", ".msi", ".deb", ".rpm", ".iso"]:
+        for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg", ".bmp", ".ico"]:
             if url_lower.endswith(ext):
-                return "software", ext.strip("."), 0
+                return "image", ext.strip("."), 0
 
 
         req_headers = {"Referer": referer}
@@ -312,28 +319,131 @@ class SnifferEngine:
                     else:
                         add_candidate(val, img.get("alt", "图片海报"))
 
-        # 10. 扫描常规文档、安装包与附件
+        # 10. 扫描常规文档、安装包与附件及网盘资源
         for a in soup.find_all("a", href=True):
             href = a["href"].strip()
             path_lower = urlparse(href).path.lower()
             doc_or_app_exts = [
                 ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".zip", ".rar", ".7z", ".txt", ".csv",
-                ".exe", ".dmg", ".pkg", ".apk", ".msi", ".deb", ".rpm", ".iso"
+                ".exe", ".dmg", ".pkg", ".apk", ".msi", ".deb", ".rpm", ".iso", ".ipa", ".appimage"
             ]
-            if any(path_lower.endswith(e) for e in doc_or_app_exts) or any(k in href.lower() for k in ["download", "/down/", "release", "installer"]):
+            pan_hosts = ["pan.quark.cn", "pan.baidu.com", "123pan.com", "lanzou", "ctfile.com", "aliyundrive.com", "drive.uc.cn"]
+            is_app_link = any(path_lower.endswith(e) for e in doc_or_app_exts)
+            is_pan_link = any(ph in href.lower() for ph in pan_hosts)
+            is_down_link = any(k in href.lower() for k in ["download", "/down/", "release", "installer"])
+
+            if is_app_link or is_pan_link or is_down_link:
                 link_text = a.get_text(strip=True) or os.path.basename(path_lower)
+                # 排除纯“教程”网盘推广干扰，优先保障软件与安装包纯度
+                if is_pan_link and "教程" in link_text and not any(k in link_text for k in ["下载", "安装包", "原件"]):
+                    continue
                 add_candidate(href, link_text)
 
+        # 11. 软件应用聚合门户深度穿透探针（攻克如 MacWk、精选软件站、WordPress 应用导航等深水区）
+        # 此类站点首页或列表页仅展示应用卡片，下载直链与网盘提取码藏在内页或通过 Ajax/弹窗动态生成
+        software_posts = []
+        for a in soup.find_all("a", href=True):
+            h = urljoin(target_url, a["href"].strip())
+            t = a.get_text(strip=True)
+            # 识别应用详情页特征（如 /app/123.html、/soft/、/mac/、/post/ 等）
+            is_app_detail = bool(re.search(r'/(?:app/|soft/|down/|software/)?\d+\.html$', h, re.IGNORECASE))
+            if is_app_detail and len(t) >= 2 and not any(bad in t for bad in ["教程", "常见故障", "留言", "登录", "注册", "排行榜"]):
+                if h not in [sp[0] for sp in software_posts]:
+                    software_posts.append((h, t))
 
-        # 11. 终极自适应无缝升级：
+        if software_posts:
+            self.log_cb(f"🚀 [软件暗河穿透] 智能探测到应用聚合门户特征，发现 {len(software_posts)} 款软件条目，正在开启深度并发穿透解析...")
+            import concurrent.futures
+
+            def probe_single_software(post_item):
+                post_url, app_name = post_item
+                found_res = []
+                try:
+                    sub_r = self.client.get(post_url, headers={"Referer": target_url})
+                    sub_html = sub_r.text
+                    sub_soup = BeautifulSoup(sub_html, "html.parser")
+
+                    # 机制 A: 检测 Ajax 弹窗下载配置（如 OneNav / MacWk 的 get_app_down_btn）
+                    btns = re.findall(r'<button[^>]*data-action=[\'"]get_app_down_btn[\'"][^>]*>', sub_html)
+                    if btns:
+                        m_post = re.search(r'data-post_id=[\'"](\d+)[\'"]', btns[0])
+                        m_id = re.search(r'data-id=[\'"](\d+)[\'"]', btns[0])
+                        if m_post and m_id:
+                            ajax_url = urljoin(post_url, '/wp-admin/admin-ajax.php')
+                            ajax_r = self.client.post(
+                                ajax_url,
+                                data={'action': 'get_app_down_btn', 'post_id': m_post.group(1), 'id': m_id.group(1)},
+                                headers={"Referer": post_url}
+                            )
+                            ajax_soup = BeautifulSoup(ajax_r.text, "html.parser")
+                            for da in ajax_soup.find_all("a", href=True):
+                                d_url = da["href"].strip()
+                                if any(ph in d_url for ph in ["pan.quark.cn", "pan.baidu.com", "123pan.com", "ctfile.com", "lanzou"]):
+                                    pwd = da.get("data-clipboard-text", "")
+                                    btn_txt = da.get_text(strip=True)
+                                    found_res.append({
+                                        "url": d_url,
+                                        "category": "pan_drive",
+                                        "ext": "dmg",
+                                        "size": 0,
+                                        "pwd": pwd,
+                                        "label": f"💻 《{app_name}》 (官方纯净安装包/转存)",
+                                        "source_engine": "MacWk直穿",
+                                        "referer": post_url
+                                    })
+
+                    # 机制 B: 抓取正文中的直链与网盘链接
+                    for sub_a in sub_soup.find_all("a", href=True):
+                        sh = sub_a["href"].strip()
+                        if any(ph in sh for ph in ["pan.quark.cn", "pan.baidu.com", "123pan.com", "ctfile.com", "lanzou"]):
+                            found_res.append({
+                                "url": sh,
+                                "category": "pan_drive",
+                                "ext": "dmg",
+                                "size": 0,
+                                "pwd": "",
+                                "label": f"💻 《{app_name}》 (全套资源附件)",
+                                "source_engine": "内页直取",
+                                "referer": post_url
+                            })
+                        elif any(sh.lower().split("?")[0].endswith(e) for e in [".dmg", ".pkg", ".zip", ".exe"]):
+                            found_res.append({
+                                "url": sh,
+                                "category": "software",
+                                "ext": sh.lower().split(".")[-1].split("?")[0],
+                                "size": 0,
+                                "label": f"💻 《{app_name}》 (直链下载)",
+                                "source_engine": "原件直通",
+                                "referer": post_url
+                            })
+                except Exception:
+                    pass
+                return found_res
+
+            # 并发深度扫描前 25 款重点热门应用，秒级穿透拿到真实下载与网盘直链
+            deep_app_results = []
+            with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+                sub_futs = [ex.submit(probe_single_software, sp) for sp in software_posts[:25]]
+                for sf in concurrent.futures.as_completed(sub_futs):
+                    for r_item in sf.result():
+                        if r_item["url"] not in seen_urls:
+                            seen_urls.add(r_item["url"])
+                            deep_app_results.append(r_item)
+
+            # 将深挖出的软件与安装包置顶展示在最前排，给用户最直接的体验
+            results = deep_app_results + results
+            self.log_cb(f"✓ [软件暗河穿透完成] 成功穿透解密出 {len(deep_app_results)} 款真实软件下载与转存直链并置顶交付！")
+
+        # 12. 终极自适应无缝升级：
         # 如果静态和DOM分析未发现可播放视频流，或者目标为典型的动态单页/SPA站点，自动无缝切换至 CDP 底层网络穿透！
         has_video = any(r.get("category") in ["video", "video_stream"] for r in results)
+        has_app = any(r.get("category") in ["software", "pan_drive"] for r in results)
         is_spa_suspicious = any(k in target_url.lower() for k in ["/play/", "/video/", "watch", ".tv", ".cc", ".me"])
-        if not has_video or is_spa_suspicious:
-            if not has_video:
-                self.log_cb("静态骨架未直接抓取到视频，系统全自动无缝升级至 Chrome CDP 深度沙箱网络拦截...")
+        if (not has_video and not has_app) or is_spa_suspicious:
+            if not has_video and not has_app:
+                self.log_cb("静态骨架未直接抓取到媒体或软件，系统全自动无缝升级至 Chrome CDP 深度沙箱网络拦截...")
             else:
-                self.log_cb("为确保视频分片完整与最佳画质，同步调遣 Chrome CDP 底层网络引擎深入探测...")
+                self.log_cb("为确保分片完整与深层网络捕获，同步调遣 Chrome CDP 底层网络引擎深入探测...")
 
             browser_results = self.analyze_with_playwright(target_url)
             for br in browser_results:

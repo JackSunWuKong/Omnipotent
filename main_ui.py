@@ -1270,18 +1270,19 @@ class MainWindow(QMainWindow):
 
         self.table = QTableWidget()
         self.table.setColumnCount(6)
-        # 优化各列伸缩和最小宽度，坚决防止内容被挤压折叠为竖排或横杠省略号
+        # 坚决杜绝列宽被拉扯挤压导致的按钮折叠与横杠省略：严格锁定各关键列固定宽
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
         self.table.setColumnWidth(0, 48)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Interactive)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
         self.table.setColumnWidth(2, 130)
-        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
+        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Fixed)
         self.table.setColumnWidth(3, 90)
-        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
-        self.table.setColumnWidth(4, 210)
+        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Fixed)
+        self.table.setColumnWidth(4, 230)
         self.table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Interactive)
         self.table.setColumnWidth(5, 120)
+        self.table.horizontalHeader().setMinimumSectionSize(48)
         self.table.verticalHeader().setDefaultSectionSize(40)
         self.table.itemDoubleClicked.connect(self.on_table_double_clicked)
         self.table.itemChanged.connect(self.update_summary_stats)
@@ -1575,12 +1576,12 @@ class MainWindow(QMainWindow):
 
             # 4. 快速操作列（直观的【▶ 立即播放】、【📖 在线阅读】、【☁️ 转存网盘】、【🧲 磁力直通】与【⬇ 下载】）
             btn_container = QWidget()
-            btn_container.setMinimumWidth(200)
+            btn_container.setFixedWidth(222)
             btn_layout = QHBoxLayout(btn_container)
             btn_layout.setContentsMargins(4, 2, 4, 2)
             btn_layout.setSpacing(6)
 
-            btn_style_base = "font-weight: bold; padding: 4px 10px; border-radius: 3px; min-width: 75px; min-height: 24px;"
+            btn_style_base = "font-weight: bold; padding: 4px 8px; border-radius: 3px; min-width: 75px; min-height: 24px;"
 
             if item["category"] in ["video", "video_stream", "audio"]:
                 play_btn = QPushButton(tr("btn_play"))

@@ -1406,11 +1406,27 @@ class MainWindow(QMainWindow):
         self.btn_omni.setEnabled(True)
         self.all_resources = results
 
-        # 如果结果中包含小说在线阅读，且用户当前只勾选了小说或综合搜索，优先保证小说分类激活
-        has_online_novel = any(r.get("sub_category") == "novel_online" for r in results)
-        if has_online_novel and self.chk_novel.isChecked():
-            # 若勾选了小说，确保小说显示，同时若用户未选其他类型，保持纯净聚焦
-            pass
+        # 智能意图与分类聚焦：若检索出的置顶核心资源为“电子小说在线阅读”，智能自动切换左侧筛选仅展示小说，避免杂乱的磁力/软件/文档干扰
+        has_online_novel = any(r.get("category") == "novel" and r.get("sub_category") == "novel_online" for r in results[:3])
+        if has_online_novel:
+            # 自动聚焦于小说分类，带来极致智能无缝的阅读体验
+            self.chk_video.blockSignals(True)
+            self.chk_novel.blockSignals(True)
+            self.chk_software.blockSignals(True)
+            self.chk_doc.blockSignals(True)
+            self.chk_image.blockSignals(True)
+
+            self.chk_novel.setChecked(True)
+            self.chk_video.setChecked(False)
+            self.chk_software.setChecked(False)
+            self.chk_doc.setChecked(False)
+            self.chk_image.setChecked(False)
+
+            self.chk_video.blockSignals(False)
+            self.chk_novel.blockSignals(False)
+            self.chk_software.blockSignals(False)
+            self.chk_doc.blockSignals(False)
+            self.chk_image.blockSignals(False)
 
         self.filter_table()
         self.append_log(tr("log_scan_done", count=len(results)))

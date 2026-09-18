@@ -688,78 +688,21 @@ class ResourceSearcher:
 
             return items
 
-        # 2. 全网网盘小说暗搜 (精校 TXT / EPUB 全本合集)
-        def fetch_pan_novel():
-            items = []
-            pan_configs = [
-                {"platform": "夸克网盘", "domain": "pan.quark.cn"},
-                {"platform": "百度网盘", "domain": "pan.baidu.com"},
-            ]
-            for p_conf in pan_configs:
-                plat = p_conf["platform"]
-                dom = p_conf["domain"]
-                try:
-                    q_str = f"{keyword} (txt OR epub) {dom}"
-                    url = f"https://www.so.com/s?q={quote(q_str)}"
-                    with httpx.Client(headers=self.headers, timeout=5.0, verify=False) as client:
-                        r = client.get(url)
-                        if r.status_code == 200:
-                            soup = BeautifulSoup(r.text, "html.parser")
-                            for li in soup.find_all("li", class_="res-list")[:8]:
-                                t_text = li.get_text()
-                                h3 = li.find("h3")
-                                title_text = h3.get_text().strip() if h3 else keyword
-                                title_clean = " ".join(title_text.split())
+        online_res = fetch_online_novel()
+        # 精准度排序：将书名完全匹配或高度匹配的放最前
+        kw_clean = keyword.strip()
+        def match_score(it):
+            lbl = it.get("label", "")
+            if f"《{kw_clean}》" in lbl:
+                return 0 # 完全匹配
+            elif kw_clean in lbl:
+                return 1 # 包含匹配
+            return 2
 
-                                if dom == "pan.quark.cn":
-                                    links = re.findall(r'https?://pan\.quark\.cn/s/[a-zA-Z0-9]+', t_text)
-                                else:
-                                    links = re.findall(r'https?://pan\.baidu\.com/s/[a-zA-Z0-9_\-]+', t_text)
+        online_res.sort(key=match_score)
+        results.extend(online_res)
 
-                                pwd_match = re.search(r'(?:提取码|密码|pwd)[:：\s]*([a-zA-Z0-9]{4})', t_text, re.IGNORECASE)
-                                pwd = pwd_match.group(1) if pwd_match else ""
-
-                                for lk in links:
-                                    if lk not in seen:
-                                        seen.add(lk)
-                                        pwd_str = f"?pwd={pwd}" if pwd and "pwd=" not in lk else ""
-                                        full_pan_url = lk + pwd_str if pwd_str else lk
-                                        items.append({
-                                            "url": full_pan_url,
-                                            "category": "novel",
-                                            "sub_category": "novel_pan",
-                                            "ext": "txt",
-                                            "size": 0,
-                                            "label": f"☁️ 《{title_clean[:45]}》 [{plat}全本TXT/EPUB] {f'(提取码: {pwd})' if pwd else '(免密直存)'}",
-                                            "source_engine": plat,
-                                            "pwd": pwd,
-                                            "referer": ""
-                                        })
-                except Exception:
-                    pass
-            return items
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            f_online = executor.submit(fetch_online_novel)
-            f_pan = executor.submit(fetch_pan_novel)
-            online_res = f_online.result()
-            pan_res = f_pan.result()
-
-            # 精准度排序：将书名完全匹配或高度匹配的放最前
-            kw_clean = keyword.strip()
-            def match_score(it):
-                lbl = it.get("label", "")
-                if f"《{kw_clean}》" in lbl:
-                    return 0 # 完全匹配
-                elif kw_clean in lbl:
-                    return 1 # 包含匹配
-                return 2
-
-            online_res.sort(key=match_score)
-            results.extend(online_res)
-            results.extend(pan_res)
-
-        self.log_cb(f"小说资源深度探索完毕！共捕获到 {len(results)} 部书籍（含在线阅读与网盘精校全本）。")
+        self.log_cb(f"小说资源深度探索完毕！共捕获到 {len(results)} 部纯净在线全本书籍。")
         return results
 
     @staticmethod
@@ -908,11 +851,10 @@ class ResourceSearcher:
 
         results = []
         if is_novel_intent:
-            self.log_cb(f"【OmniFinder】检测到小说/书籍意图，优先检索全网小说与TXT/EPUB精校资源池...")
+            self.log_cb(f"【OmniFinder】检测到小说/书籍意图，进入纯净原生在线阅读搜索模式...")
             clean_book_name = re.sub(r'(?:小说|txt|epub|全本|完本|精校|无删减|下载)', '', keyword, flags=re.IGNORECASE).strip()
             book_query = clean_book_name if clean_book_name else keyword
             results.extend(self.search_novels(book_query))
-            results.extend(self.search_pan_drives(keyword))
         elif is_doc_intent:
             self.log_cb(f"【OmniFinder】检测到办公/文档/素材意图，优先检索全国模板库与文档资源...")
             results.extend(self.search_documents(keyword))

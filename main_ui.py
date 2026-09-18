@@ -1451,7 +1451,8 @@ class MainWindow(QMainWindow):
                 if show_video or show_doc or show_software:
                     filtered.append(r)
             elif cat == "pan_drive":
-                if show_video or show_doc or show_software or show_novel:
+                # 网盘转存资源仅在勾选办公文档或软件时展示，避免外部网盘污染小说在线纯净阅读
+                if show_doc or show_software:
                     filtered.append(r)
             elif cat == "software" and show_software:
                 filtered.append(r)
@@ -1501,16 +1502,10 @@ class MainWindow(QMainWindow):
                 play_btn.clicked.connect(lambda checked, url=item["url"], t=clean_name, ref=item.get("referer", ""): self.play_item_stream(url, t, ref))
                 btn_layout.addWidget(play_btn)
             elif item["category"] == "novel":
-                if item.get("sub_category") == "novel_online":
-                    read_btn = QPushButton(tr("btn_read_novel"))
-                    read_btn.setStyleSheet("background-color: #00897B; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
-                    read_btn.clicked.connect(lambda checked, it=item: self.open_novel_reader(it))
-                    btn_layout.addWidget(read_btn)
-                else:
-                    pan_btn = QPushButton(tr("btn_pan"))
-                    pan_btn.setStyleSheet("background-color: #7B1FA2; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
-                    pan_btn.clicked.connect(lambda checked, it=item: self.open_pan_drive_item(it))
-                    btn_layout.addWidget(pan_btn)
+                read_btn = QPushButton(tr("btn_read_novel"))
+                read_btn.setStyleSheet("background-color: #00897B; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
+                read_btn.clicked.connect(lambda checked, it=item: self.open_novel_reader(it))
+                btn_layout.addWidget(read_btn)
 
                 down_btn = QPushButton(tr("btn_download_novel"))
                 down_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
@@ -1618,12 +1613,8 @@ class MainWindow(QMainWindow):
         dialog.exec_()
 
     def download_novel_item(self, item: dict):
-        """小说全本下载：若是网盘直链直接唤起网盘转存，若是纯在线则打开阅读器一键导出TXT"""
-        sub_cat = item.get("sub_category", "")
-        if sub_cat == "novel_pan" or "pan." in item.get("url", ""):
-            self.open_pan_drive_item(item)
-        else:
-            self.open_novel_reader(item)
+        """小说全本下载：打开原生阅读器一键批量缓存与导出 TXT，无需网盘与外部跳转"""
+        self.open_novel_reader(item)
 
     def on_table_double_clicked(self, item):
         row = item.row()
@@ -1639,10 +1630,7 @@ class MainWindow(QMainWindow):
             referer = data.get("referer", "")
             self.play_item_stream(url, title, referer)
         elif data.get("category") == "novel":
-            if data.get("sub_category") == "novel_online":
-                self.open_novel_reader(data)
-            else:
-                self.open_pan_drive_item(data)
+            self.open_novel_reader(data)
         elif data.get("category") == "pan_drive":
             self.open_pan_drive_item(data)
         elif data.get("category") == "magnet":

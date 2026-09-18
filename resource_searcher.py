@@ -828,12 +828,21 @@ class ResourceSearcher:
         if deep_dive:
             return self.search_deep_dive(keyword)
 
-        # 1. 如果前端明确指定或勾选了“电子小说”专属分类
+        # 1. 如果前端明确指定或勾选了专有分类
         if category_hint == "novel":
-            self.log_cb(f"【OmniFinder】已定向进入小说全本模式，检索在线秒读与网盘全本书籍...")
+            self.log_cb(f"【OmniFinder】已定向进入小说全本模式，检索在线秒读全本书籍...")
             clean_book_name = re.sub(r'(?:小说|txt|epub|全本|完本|精校|无删减|下载)', '', keyword, flags=re.IGNORECASE).strip()
             book_query = clean_book_name if clean_book_name else keyword
             return self.search_novels(book_query)
+        elif category_hint == "document":
+            self.log_cb(f"【OmniFinder】已定向进入办公文档/模板模式，检索文档素材与模板库...")
+            return self.search_documents(keyword)
+        elif category_hint == "software":
+            self.log_cb(f"【OmniFinder】已定向进入软件应用模式，检索应用安装包与绿色工具...")
+            return self.search_software(keyword)
+        elif category_hint == "video":
+            self.log_cb(f"【OmniFinder】已定向进入影视流媒体模式，检索可播放视频源...")
+            return self.search_videos(keyword)
 
         # 智能检测是否输入的是剧情描述
         clue_indicators = ["被困", "迷宫", "杀手", "失忆", "特工", "反杀", "互换", "荒岛", "讲的是", "解说", "小帅"]

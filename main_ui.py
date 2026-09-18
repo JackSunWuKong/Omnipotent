@@ -1224,10 +1224,19 @@ class MainWindow(QMainWindow):
 
         self.table = QTableWidget()
         self.table.setColumnCount(6)
+        # 优化各列伸缩和最小宽度，坚决防止内容被挤压折叠为竖排或横杠省略号
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
+        self.table.setColumnWidth(0, 48)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Interactive)
+        self.table.setColumnWidth(2, 130)
+        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Interactive)
+        self.table.setColumnWidth(3, 90)
+        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Interactive)
+        self.table.setColumnWidth(4, 210)
         self.table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Interactive)
+        self.table.setColumnWidth(5, 120)
+        self.table.verticalHeader().setDefaultSectionSize(40)
         self.table.itemDoubleClicked.connect(self.on_table_double_clicked)
         self.table.itemChanged.connect(self.update_summary_stats)
         table_layout.addWidget(self.table)
@@ -1388,13 +1397,19 @@ class MainWindow(QMainWindow):
         else:
             self.append_log(tr("log_start_search", keyword=raw_text))
             is_deep = self.chk_deep_dive.isChecked()
-            # 获取用户勾选的专有分类（当用户专门勾选小说或单一分类时精准定向）
+            # 获取用户勾选的专有分类（当用户专门勾选小说/文档/软件等单一或特定分类时精准定向）
             cat_hint = None
-            if self.chk_novel.isChecked() and not self.chk_video.isChecked():
+            active_cats = []
+            if self.chk_video.isChecked(): active_cats.append("video")
+            if self.chk_novel.isChecked(): active_cats.append("novel")
+            if self.chk_software.isChecked(): active_cats.append("software")
+            if self.chk_doc.isChecked(): active_cats.append("document")
+            if self.chk_image.isChecked(): active_cats.append("image")
+
+            if len(active_cats) == 1:
+                cat_hint = active_cats[0]
+            elif "novel" in active_cats and "video" not in active_cats and "doc" not in active_cats:
                 cat_hint = "novel"
-            elif self.chk_novel.isChecked() and (not self.chk_software.isChecked() or not self.chk_doc.isChecked()):
-                # 用户有针对性勾选
-                pass
 
             def run_search_worker():
                 searcher = ResourceSearcher(log_cb=self.signals.log_signal.emit)
@@ -1406,9 +1421,10 @@ class MainWindow(QMainWindow):
         self.btn_omni.setEnabled(True)
         self.all_resources = results
 
-        # 智能意图与分类聚焦：若检索出的置顶核心资源为“电子小说在线阅读”，智能自动切换左侧筛选仅展示小说，避免杂乱的磁力/软件/文档干扰
+        # 智能意图与分类聚焦：若用户没有特意单独只勾某类，且检索出的置顶核心资源为“电子小说在线阅读”，智能自动切换左侧筛选聚焦展示小说
+        active_cats_count = sum([self.chk_video.isChecked(), self.chk_novel.isChecked(), self.chk_software.isChecked(), self.chk_doc.isChecked(), self.chk_image.isChecked()])
         has_online_novel = any(r.get("category") == "novel" and r.get("sub_category") == "novel_online" for r in results[:3])
-        if has_online_novel:
+        if has_online_novel and active_cats_count > 1:
             # 自动聚焦于小说分类，带来极致智能无缝的阅读体验
             self.chk_video.blockSignals(True)
             self.chk_novel.blockSignals(True)
@@ -1447,11 +1463,11 @@ class MainWindow(QMainWindow):
             elif cat == "novel" and show_novel:
                 filtered.append(r)
             elif cat == "magnet":
-                # 磁力链通常为影视或大文件BT，只在勾选影视或软件文档时呈现，绝对不污染小说在线阅读
-                if show_video or show_doc or show_software:
+                # 磁力BT资源：仅在勾选影视或软件时展示，避免污染纯办公文档与小说在线阅读
+                if show_video or show_software:
                     filtered.append(r)
             elif cat == "pan_drive":
-                # 网盘转存资源仅在勾选办公文档或软件时展示，避免外部网盘污染小说在线纯净阅读
+                # 网盘转存资源：仅在勾选软件或办公文档时展示
                 if show_doc or show_software:
                     filtered.append(r)
             elif cat == "software" and show_software:
@@ -1492,43 +1508,46 @@ class MainWindow(QMainWindow):
 
             # 4. 快速操作列（直观的【▶ 立即播放】、【📖 在线阅读】、【☁️ 转存网盘】、【🧲 磁力直通】与【⬇ 下载】）
             btn_container = QWidget()
+            btn_container.setMinimumWidth(200)
             btn_layout = QHBoxLayout(btn_container)
-            btn_layout.setContentsMargins(2, 2, 2, 2)
+            btn_layout.setContentsMargins(4, 2, 4, 2)
             btn_layout.setSpacing(6)
+
+            btn_style_base = "font-weight: bold; padding: 4px 10px; border-radius: 3px; min-width: 75px; min-height: 24px;"
 
             if item["category"] in ["video", "video_stream", "audio"]:
                 play_btn = QPushButton(tr("btn_play"))
-                play_btn.setStyleSheet("background-color: #00C853; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
+                play_btn.setStyleSheet(f"background-color: #00C853; color: white; {btn_style_base}")
                 play_btn.clicked.connect(lambda checked, url=item["url"], t=clean_name, ref=item.get("referer", ""): self.play_item_stream(url, t, ref))
                 btn_layout.addWidget(play_btn)
             elif item["category"] == "novel":
                 read_btn = QPushButton(tr("btn_read_novel"))
-                read_btn.setStyleSheet("background-color: #00897B; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
+                read_btn.setStyleSheet(f"background-color: #00897B; color: white; {btn_style_base}")
                 read_btn.clicked.connect(lambda checked, it=item: self.open_novel_reader(it))
                 btn_layout.addWidget(read_btn)
 
                 down_btn = QPushButton(tr("btn_download_novel"))
-                down_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
+                down_btn.setStyleSheet(f"background-color: #4CAF50; color: white; {btn_style_base}")
                 down_btn.clicked.connect(lambda checked, it=item: self.download_novel_item(it))
                 btn_layout.addWidget(down_btn)
             elif item["category"] == "pan_drive":
                 pan_btn = QPushButton(tr("btn_pan"))
-                pan_btn.setStyleSheet("background-color: #7B1FA2; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
+                pan_btn.setStyleSheet(f"background-color: #7B1FA2; color: white; {btn_style_base}")
                 pan_btn.clicked.connect(lambda checked, it=item: self.open_pan_drive_item(it))
                 btn_layout.addWidget(pan_btn)
             elif item["category"] == "magnet":
                 mag_btn = QPushButton(tr("btn_magnet"))
-                mag_btn.setStyleSheet("background-color: #E65100; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
+                mag_btn.setStyleSheet(f"background-color: #E65100; color: white; {btn_style_base}")
                 mag_btn.clicked.connect(lambda checked, it=item: self.open_magnet_item(it))
                 btn_layout.addWidget(mag_btn)
             else:
                 prev_btn = QPushButton(tr("btn_preview"))
-                prev_btn.setStyleSheet("background-color: #0288D1; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
+                prev_btn.setStyleSheet(f"background-color: #0288D1; color: white; {btn_style_base}")
                 prev_btn.clicked.connect(lambda checked, it=item: self.preview_resource_item(it))
                 btn_layout.addWidget(prev_btn)
 
                 down_single_btn = QPushButton(tr("btn_download_single"))
-                down_single_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 4px 10px; border-radius: 3px;")
+                down_single_btn.setStyleSheet(f"background-color: #4CAF50; color: white; {btn_style_base}")
                 down_single_btn.clicked.connect(lambda checked, it=item: self.download_single_item(it))
                 btn_layout.addWidget(down_single_btn)
 

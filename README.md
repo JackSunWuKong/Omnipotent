@@ -25,6 +25,22 @@
 
 ---
 
+## 💡 OmniFinder 与普通搜索引擎的根本区别 (超越搜索引擎的智能爬虫与穿透体系)
+
+普通搜索引擎（如百度、谷歌、必应）仅仅是**网页超链接索引器**，返回的是充斥着广告、虚假诱导按钮、付费弹窗、甚至木马捆绑下载器的三方网页，用户需要一级级跳转、点击数次才能找到内容，或者根本找不到。
+
+**OmniFinder (万象探索)** 是一个具备**深度网络协议穿透、二进制流逆向解析、多层 DOM 爬取与原生直达**的智能爬虫系统：
+
+| 核心维度 | 普通搜索引擎 (Search Engines) | 🌟 OmniFinder 万象探索 (深度爬虫系统) |
+| :--- | :--- | :--- |
+| **交付形态** | 给出网页链接列表，用户必须跳转到第三方浏览器 | **原生应用内直接交付**（在线直接秒播、直接小说阅读、直接下载文件） |
+| **内容真实度** | 大量假下载按钮、流氓推广页、虚假资源诱导 | **真实网络协议探针校验**：穿透底层验证 `Content-Disposition`、二进制 Magic Number 签名与真实 M3U8 流 |
+| **深水区穿透** | 无法索引动态 JS 渲染的流、网盘深层文件、DHT 分布式网络 | **智能爬虫引擎**：CDP 底层网络拦截、苹果/海洋 CMS 播放源逆向脱敏、全网暗河穿透 |
+| **小说阅读** | 导向充满弹窗、乱码、收费拦截的三方流氓网站 | **智能无头爬取全本目录**，剥离广告正文，提供纯净原生小说阅读器，支持一键缓存导出 TXT |
+| **视频流处理** | 无法直接播放，甚至播放需要各种专用播放器捆绑 | **原生硬件加速**，自动嗅探抓取 HLS/M3U8 切片，本地流媒体代理抗防盗链 |
+
+---
+
 ## ✨ 核心特性
 
 | 功能模块 | 技术实现 | 核心价值 |
@@ -113,6 +129,22 @@ python3 main_ui.py
 
 > [!NOTE]
 > **Compliance Notice**: This project is strictly non-commercial and developed for personal educational research and technical experiments to analyze client-server interactions, stream segment reassembly, and cross-lingual semantic alignment.
+
+---
+
+## 💡 How OmniFinder Differs From Traditional Search Engines
+
+Standard search engines (such as Google, Bing, or Baidu) are merely **hyperlink indexers**. They return messy third-party web pages packed with ads, deceptive download buttons, paywalls, and bundled installers, forcing users to click through multiple redirection layers or hit dead ends.
+
+**OmniFinder** is an intelligent crawling and protocol penetration system designed for **deep stream decryption, binary inspection, and direct in-app fulfillment**:
+
+| Dimension | Traditional Search Engines | 🌟 OmniFinder (Deep Ingestion Agent) |
+| :--- | :--- | :--- |
+| **Delivery Model** | Outputs external URLs, forcing users into third-party browsers | **Direct in-app delivery** (instant native video streaming, built-in novel reading, direct binary download) |
+| **Integrity Verification** | Flooded with fake download traps and adware pages | **Protocol-level verification**: Validates `Content-Disposition`, binary Magic Numbers, and authentic M3U8 stream playlists |
+| **Deep Penetration** | Cannot crawl dynamic JS streams, cloud drive structures, or DHT networks | **Advanced Crawler Engine**: CDP interception, CMS script de-obfuscation, and deep decentralized DHT discovery |
+| **Novel / E-Book Experience**| Redirects to intrusive, ad-infested, or broken reader sites | **Headless chapter scraping** with ad-stripping, native e-reader with custom eye-care themes, and 1-click TXT export |
+| **Media Playback** | Requires external media players and manual bypass of anti-leeching | **Hardware accelerated playback** with local reverse proxy to defeat anti-hotlinking |
 
 ---
 

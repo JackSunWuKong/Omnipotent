@@ -170,3 +170,57 @@ class Downloader:
             log_cb(f"✗ 备用通道异常: {e}")
 
         return False, "failed"
+
+    def download_novel_book(self, book_url: str, book_title: str, fetch_chapters_fn, fetch_content_fn, log_cb=print, progress_cb=None):
+        """
+        全自动化后台抓取全本小说目录与正文，并发拉取章节后整合成排版纯净的 TXT 文件
+        用户直接在本地保存目录获得整本无广告、分章清晰的小说！
+        """
+        clean_title = sanitize_filename(book_title.replace("📖 ", "").replace(" ", "_"))
+        target_path = os.path.join(self.save_dir, f"{clean_title}.txt")
+        log_cb(f"🚀 [全自动抓书引擎] 正在抓取《{clean_title}》的完整章节目录...")
+
+        try:
+            chapters = fetch_chapters_fn(book_url)
+            if not chapters:
+                log_cb(f"✗ 未能解析到《{clean_title}》的目录")
+                return False, "no chapters found"
+
+            total_chs = len(chapters)
+            log_cb(f"📚 已锁定《{clean_title}》共 {total_chs} 章，启动高速并发全本抓取...")
+
+            import concurrent.futures
+            # 并发抓取章节正文，保证顺序组装
+            results_dict = {}
+            def fetch_single(idx_ch):
+                idx, ch = idx_ch
+                t, body = fetch_content_fn(ch["url"])
+                return idx, t or ch["title"], body
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+                futs = [ex.submit(fetch_single, (i, ch)) for i, ch in enumerate(chapters)]
+                done_count = 0
+                for f in concurrent.futures.as_completed(futs):
+                    idx, t, body = f.result()
+                    results_dict[idx] = (t, body)
+                    done_count += 1
+                    if progress_cb:
+                        progress_cb(int((done_count / total_chs) * 100))
+
+            log_cb(f"✍️ 正在合并全本并生成标准 TXT 文件...")
+            with open(target_path, "w", encoding="utf-8") as f:
+                f.write(f"《{clean_title}》\n")
+                f.write(f"全本共 {total_chs} 章 | 自动化离线导出版\n")
+                f.write("=" * 50 + "\n\n")
+                for i in range(total_chs):
+                    t, body = results_dict.get(i, (chapters[i]["title"], "本章内容加载失败"))
+                    f.write(f"### {t}\n\n")
+                    f.write(f"{body}\n\n")
+                    f.write("-" * 30 + "\n\n")
+
+            log_cb(f"✓ 《{clean_title}》全本抓取导出成功！已保存在: {target_path}")
+            return True, target_path
+        except Exception as e:
+            log_cb(f"✗ 抓取全本小说异常: {e}")
+            return False, str(e)
+

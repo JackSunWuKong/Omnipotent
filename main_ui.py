@@ -737,6 +737,7 @@ class NovelReaderDialog(QDialog):
         self.font_size = 18
         self.all_chapters = []
         self.current_chapter_idx = 0
+        self.chapter_cache = {}  # 智能内存预加载缓存: {chapter_idx: (title, content)}
 
         self.chapter_loaded_signal.connect(self._on_chapter_loaded)
         self.chapters_ready_signal.connect(self._on_chapters_ready)
@@ -974,7 +975,6 @@ class NovelReaderDialog(QDialog):
         self.toc_list.setCurrentRow(index)
         ch = self.all_chapters[index]
         self.chapter_title_lbl.setText(ch["title"])
-        self.text_browser.setPlainText(tr("reader_loading_ch"))
 
         total = len(self.all_chapters)
         pct = int(((index + 1) / total) * 100) if total > 0 else 0
@@ -983,16 +983,40 @@ class NovelReaderDialog(QDialog):
         self.btn_prev.setEnabled(index > 0)
         self.btn_next.setEnabled(index < total - 1)
 
+        # 智能体验：如果该章节已被预加载过，0 毫秒瞬间出文！
+        if index in self.chapter_cache:
+            t, content = self.chapter_cache[index]
+            self._on_chapter_loaded(t, content)
+            self._prefetch_next_chapters(index)
+            return
+
+        self.text_browser.setPlainText(tr("reader_loading_ch"))
+
         def worker():
             t, content = ResourceSearcher.fetch_chapter_content(ch["url"])
-            self.chapter_loaded_signal.emit(t or ch["title"], content)
+            actual_title = t or ch["title"]
+            self.chapter_cache[index] = (actual_title, content)
+            self.chapter_loaded_signal.emit(actual_title, content)
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _prefetch_next_chapters(self, current_idx: int):
+        """智能后台预加载未来 2 章，用户点【下一章】时实现 0 毫秒秒切！"""
+        def prefetch_worker():
+            for offset in [1, 2]:
+                next_idx = current_idx + offset
+                if 0 <= next_idx < len(self.all_chapters) and next_idx not in self.chapter_cache:
+                    n_ch = self.all_chapters[next_idx]
+                    t, content = ResourceSearcher.fetch_chapter_content(n_ch["url"])
+                    if content and "正文加载失败" not in content:
+                        self.chapter_cache[next_idx] = (t or n_ch["title"], content)
+        threading.Thread(target=prefetch_worker, daemon=True).start()
 
     def _on_chapter_loaded(self, title: str, content: str):
         self.chapter_title_lbl.setText(title)
         self.text_browser.setPlainText(content)
         self.text_browser.verticalScrollBar().setValue(0)
+        self._prefetch_next_chapters(self.current_chapter_idx)
 
     def _on_toc_clicked(self, item: QListWidgetItem):
         idx = item.data(Qt.UserRole)
@@ -1015,21 +1039,43 @@ class NovelReaderDialog(QDialog):
         if not save_path:
             return
 
-        # 异步后台批量爬取章节合成 TXT
+        # 异步后台多线程高速并发爬取章节合成 TXT
         self.btn_export.setEnabled(False)
-        self.btn_export.setText("正在导出...")
+        self.btn_export.setText("正在极速导出 0%...")
 
         def export_worker():
             try:
+                total_chs = len(self.all_chapters)
+                results_dict = {}
+
+                def fetch_single(idx_ch):
+                    idx, ch = idx_ch
+                    t, body = ResourceSearcher.fetch_chapter_content(ch["url"])
+                    return idx, t or ch["title"], body
+
+                import concurrent.futures
+                done_count = 0
+                with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+                    futs = [ex.submit(fetch_single, (i, ch)) for i, ch in enumerate(self.all_chapters)]
+                    for f in concurrent.futures.as_completed(futs):
+                        idx, t, body = f.result()
+                        results_dict[idx] = (t, body)
+                        done_count += 1
+                        pct = int((done_count / total_chs) * 100)
+                        QTimer.singleShot(0, lambda p=pct: self.btn_export.setText(f"导出中 {p}%..."))
+
                 with open(save_path, "w", encoding="utf-8") as f:
-                    f.write(f"《{self.book_title}》\n\n")
-                    for i, ch in enumerate(self.all_chapters):
-                        t, content = ResourceSearcher.fetch_chapter_content(ch["url"])
-                        f.write(f"{t or ch['title']}\n\n")
-                        f.write(content + "\n\n" + "="*40 + "\n\n")
+                    f.write(f"《{self.book_title}》\n")
+                    f.write(f"共 {total_chs} 章 | 纯净排版全本\n")
+                    f.write("=" * 50 + "\n\n")
+                    for i in range(total_chs):
+                        t, content = results_dict.get(i, (self.all_chapters[i]["title"], "本章内容加载失败"))
+                        f.write(f"### {t}\n\n")
+                        f.write(content + "\n\n" + "-" * 30 + "\n\n")
+
                 QTimer.singleShot(0, lambda: QMessageBox.information(self, tr("msg_tip"), tr("reader_export_done", path=save_path)))
             except Exception as e:
-                QTimer.singleShot(0, lambda: QMessageBox.warning(self, tr("msg_tip"), f"导出失败: {e}"))
+                QTimer.singleShot(0, lambda err=e: QMessageBox.warning(self, tr("msg_tip"), f"导出失败: {err}"))
             finally:
                 QTimer.singleShot(0, lambda: (self.btn_export.setEnabled(True), self.btn_export.setText(tr("reader_export_txt"))))
 
@@ -1632,8 +1678,10 @@ class MainWindow(QMainWindow):
         dialog.exec_()
 
     def download_novel_item(self, item: dict):
-        """小说全本下载：打开原生阅读器一键批量缓存与导出 TXT，无需网盘与外部跳转"""
-        self.open_novel_reader(item)
+        """小说全本下载：一键自动后台全量抓取各章节并整合成 TXT 保存至下载目录，免任何弹窗折腾"""
+        clean_name = item.get("label", "小说").replace("📖 ", "").replace(" ", "_")
+        self.append_log(f"⚡ [自动化引擎] 正在全自动抓取《{clean_name}》全本并整合为 TXT...")
+        self.download_single_item(item)
 
     def on_table_double_clicked(self, item):
         row = item.row()
@@ -1701,9 +1749,19 @@ class MainWindow(QMainWindow):
                 ext = res["ext"]
                 label = res.get("label", "")
                 item_referer = res.get("referer") or default_referer
-                clean_title = label.replace("🎬 ", "").replace(" ", "_")
+                clean_title = label.replace("🎬 ", "").replace("📖 ", "").replace(" ", "_")
 
-                if cat == "video_stream" or ext == "m3u8":
+                if cat == "novel":
+                    # 全自动小说爬取与全本 TXT 封装
+                    ok, path = dl.download_novel_book(
+                        book_url=url,
+                        book_title=clean_title,
+                        fetch_chapters_fn=ResourceSearcher.fetch_novel_chapters,
+                        fetch_content_fn=ResourceSearcher.fetch_chapter_content,
+                        log_cb=self.signals.log_signal.emit,
+                        progress_cb=self.signals.progress_signal.emit
+                    )
+                elif cat == "video_stream" or ext == "m3u8":
                     ok, path = dl.download_m3u8(url, item_referer, clean_title, log_cb=self.signals.log_signal.emit)
                     if ok and path:
                         self.downloaded_video_files.append(path)

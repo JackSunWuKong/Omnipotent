@@ -134,6 +134,43 @@ class ResourceSearcher:
             return score
 
         unique_results.sort(key=calculate_score, reverse=True)
+
+        # 5. 高活真实性快速并发探针（针对排在最前列的流媒体候选集执行毫秒级健康度测活，彻底剔除已失效死链）
+        top_stream_indices = [i for i, r in enumerate(unique_results[:30]) if r.get("category") == "video_stream"]
+        if top_stream_indices:
+            def probe_stream_alive(idx):
+                item = unique_results[idx]
+                u = item.get("url", "")
+                try:
+                    with httpx.Client(verify=False, timeout=1.8, follow_redirects=True) as client:
+                        r = client.head(u, headers={"User-Agent": "Mozilla/5.0"})
+                        if r.status_code == 200:
+                            return idx, True
+                        if r.status_code in [403, 404, 500, 502, 503]:
+                            return idx, False
+                        # 尝试流式检测首字节
+                        r_get = client.get(u, headers={"User-Agent": "Mozilla/5.0", "Range": "bytes=0-256"})
+                        is_ok = r_get.status_code in [200, 206] and "<html" not in r_get.text[:200].lower()
+                        return idx, is_ok
+                except Exception:
+                    return idx, True # 网络超时不做无辜误杀
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=min(12, len(top_stream_indices))) as executor:
+                futs = [executor.submit(probe_stream_alive, idx) for idx in top_stream_indices]
+                dead_indices = set()
+                for f in concurrent.futures.as_completed(futs):
+                    idx, is_alive = f.result()
+                    if not is_alive:
+                        dead_indices.add(idx)
+
+            if dead_indices:
+                live_items = [item for i, item in enumerate(unique_results) if i not in dead_indices]
+                dead_items = [unique_results[i] for i in dead_indices]
+                # 将死链标记并压入末尾
+                for d in dead_items:
+                    d["label"] = d.get("label", "") + " [⚠️源站或已下线]"
+                unique_results = live_items + dead_items
+
         return unique_results
 
     def resolve_multilingual_aliases(self, keyword: str):

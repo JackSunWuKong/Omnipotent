@@ -329,8 +329,18 @@ class EmbeddedPlayerDialog(QDialog):
             self.btn_play.setText("▶")
 
     def on_media_error(self, error):
-        err_msg = self.player.errorString()
-        self.status_lbl.setText(tr("player_status_error", err=err_msg))
+        err_msg = self.player.errorString() or "Failed to load media"
+        # 智能容灾重试：如果经由本地代理加载失败且尚未尝试过直链，自动无缝回退直连源站
+        if hasattr(self, "play_url") and "127.0.0.1" in self.play_url and not getattr(self, "_tried_direct_fallback", False):
+            self._tried_direct_fallback = True
+            self.status_lbl.setText("⚡ 正在切换直连极速通道重试...")
+            self.status_lbl.setStyleSheet("color: #0288D1; font-size: 12px; margin-left: 12px;")
+            self.play_url = self.video_url
+            self.player.setMedia(QMediaContent(QUrl(self.video_url)))
+            self.player.play()
+            return
+
+        self.status_lbl.setText(f"⚠ 原生解码提示: {err_msg} (可点击右上角调用系统播放器播放)")
         self.status_lbl.setStyleSheet("color: #f85149; font-size: 12px; margin-left: 12px;")
 
     def toggle_fullscreen(self):

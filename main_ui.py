@@ -35,7 +35,7 @@ from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtMultimediaWidgets import QVideoWidget
 
 from sniffer_engine import SnifferEngine
-from downloader import Downloader
+from downloader import Downloader, format_speed, format_eta
 from resource_searcher import ResourceSearcher
 from player_server import get_proxy_stream_url
 from i18n import tr, get_i18n
@@ -1083,10 +1083,9 @@ class NovelReaderDialog(QDialog):
 
 
 class WorkerSignals(QObject):
-
     log_signal = pyqtSignal(str)
     scan_finished = pyqtSignal(list)
-    progress_signal = pyqtSignal(int)
+    progress_signal = pyqtSignal(int, float, float)  # pct, speed (B/s), eta (s)
     download_finished = pyqtSignal(list)
 
 
@@ -1325,9 +1324,34 @@ class MainWindow(QMainWindow):
 
         bottom_layout.addLayout(path_layout)
 
+        # 高性能下载监控仪表盘（进度百分比 + 实时下载速率 + 精准剩余时间）
+        progress_info_layout = QHBoxLayout()
         self.progress_bar = QProgressBar()
         self.progress_bar.setValue(0)
-        bottom_layout.addWidget(self.progress_bar)
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                text-align: center;
+                height: 18px;
+                font-weight: bold;
+            }
+            QProgressBar::chunk {
+                background-color: #4CAF50;
+                border-radius: 3px;
+            }
+        """)
+        progress_info_layout.addWidget(self.progress_bar, 3)
+
+        self.speed_label = QLabel("🚀 速率: 0.0 KB/s")
+        self.speed_label.setStyleSheet("color: #0277BD; font-weight: bold; padding: 0 8px; font-size: 12px;")
+        progress_info_layout.addWidget(self.speed_label, 1)
+
+        self.eta_label = QLabel("⏱️ 剩余: --:--")
+        self.eta_label.setStyleSheet("color: #555; font-weight: bold; padding: 0 8px; font-size: 12px;")
+        progress_info_layout.addWidget(self.eta_label, 1)
+
+        bottom_layout.addLayout(progress_info_layout)
 
         main_layout.addWidget(self.bottom_group)
 
@@ -1338,7 +1362,40 @@ class MainWindow(QMainWindow):
         self.log_text.setReadOnly(True)
         log_layout.addWidget(self.log_text)
 
+        # 全局悬浮平滑提示条（无感交互，彻底替代打断用户操作的弹窗）
+        self.notify_banner = QLabel()
+        self.notify_banner.setStyleSheet("""
+            QLabel {
+                background-color: #323232;
+                color: #ffffff;
+                font-weight: bold;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-size: 13px;
+            }
+        """)
+        self.notify_banner.setAlignment(Qt.AlignCenter)
+        self.notify_banner.setVisible(False)
+        log_layout.addWidget(self.notify_banner)
+
         main_layout.addWidget(self.log_group, 2)
+
+    def show_toast(self, text: str, duration_ms: int = 4000, bg_color: str = "#2E7D32"):
+        """毫秒级全局平滑悬浮提示，不弹模态窗口，0打断用户体验"""
+        if hasattr(self, "notify_banner"):
+            self.notify_banner.setStyleSheet(f"""
+                QLabel {{
+                    background-color: {bg_color};
+                    color: #ffffff;
+                    font-weight: bold;
+                    padding: 8px 16px;
+                    border-radius: 4px;
+                    font-size: 13px;
+                }}
+            """)
+            self.notify_banner.setText(text)
+            self.notify_banner.setVisible(True)
+            QTimer.singleShot(duration_ms, lambda: self.notify_banner.setVisible(False))
 
     def on_language_changed(self, index):
         selected_code = self.lang_combo.itemData(index)
@@ -1388,8 +1445,17 @@ class MainWindow(QMainWindow):
     def append_log(self, text: str):
         self.log_text.append(text)
 
-    def update_progress(self, val: int):
+    def update_progress(self, val: int, speed: float = 0.0, eta: float = 0.0):
         self.progress_bar.setValue(val)
+        if hasattr(self, "speed_label") and speed > 0:
+            self.speed_label.setText(f"🚀 速率: {format_speed(speed)}")
+        elif hasattr(self, "speed_label") and val >= 100:
+            self.speed_label.setText("🚀 速率: --")
+
+        if hasattr(self, "eta_label") and eta > 0:
+            self.eta_label.setText(f"⏱️ 剩余: {format_eta(eta)}")
+        elif hasattr(self, "eta_label") and val >= 100:
+            self.eta_label.setText("⏱️ 剩余: 00:00")
 
     def choose_save_dir(self):
         dir_path = QFileDialog.getExistingDirectory(self, tr("dialog_choose_dir"), self.save_dir)
@@ -1674,23 +1740,24 @@ class MainWindow(QMainWindow):
         self.start_download()
 
     def open_pan_drive_item(self, item: dict):
-        """打开网盘转存：一键复制链接与提取码，并在浏览器中自动打开网盘页面"""
+        """打开网盘转存：一键自动复制链接与提取码，无感唤醒浏览器，0阻断弹窗"""
         url = item.get("url", "")
         pwd = item.get("pwd", "")
         clipboard = QApplication.clipboard()
         copy_text = f"链接: {url}" + (f"\n提取码: {pwd}" if pwd else "")
         clipboard.setText(copy_text)
         self.append_log(f"【网盘转存】已复制网盘链接与提取码: {copy_text}")
-        QMessageBox.information(self, tr("pan_copied_title"), tr("pan_copied_msg", url=url, pwd=pwd or "无"))
+        pwd_hint = f"（提取码: {pwd}）" if pwd else "（免密直连）"
+        self.show_toast(f"⚡ 已自动复制网盘链接与提取码 {pwd_hint}，正在唤起浏览器...", duration_ms=3500, bg_color="#7B1FA2")
         QDesktopServices.openUrl(QUrl(url))
 
     def open_magnet_item(self, item: dict):
-        """磁力直通：一键复制 magnet: 链接至剪贴板，并尝试唤醒本机 BT 客户端"""
+        """磁力直通：一键复制 magnet 链接，无感唤醒本机 BT/下载器，0阻断弹窗"""
         url = item.get("url", "")
         clipboard = QApplication.clipboard()
         clipboard.setText(url)
         self.append_log(f"【磁力直通】已复制磁力链接到剪贴板: {url[:60]}...")
-        QMessageBox.information(self, tr("magnet_copied_title"), tr("magnet_copied_msg"))
+        self.show_toast("🧲 已复制磁力直通链接 (magnet:) 至剪贴板，正在唤醒下载客户端...", duration_ms=3500, bg_color="#E65100")
         QDesktopServices.openUrl(QUrl(url))
 
     def open_novel_reader(self, item: dict):
@@ -1773,6 +1840,13 @@ class MainWindow(QMainWindow):
                 item_referer = res.get("referer") or default_referer
                 clean_title = label.replace("🎬 ", "").replace("📖 ", "").replace(" ", "_")
 
+                base_pct = int(((idx - 1) / total) * 100)
+                span = 100 / total
+
+                def item_progress_cb(item_pct, speed=0.0, eta=0.0):
+                    overall_pct = min(99, int(base_pct + (item_pct / 100.0) * span))
+                    self.signals.progress_signal.emit(overall_pct, float(speed), float(eta))
+
                 if cat == "novel":
                     # 全自动小说爬取与全本 TXT 封装
                     ok, path = dl.download_novel_book(
@@ -1781,19 +1855,27 @@ class MainWindow(QMainWindow):
                         fetch_chapters_fn=ResourceSearcher.fetch_novel_chapters,
                         fetch_content_fn=ResourceSearcher.fetch_chapter_content,
                         log_cb=self.signals.log_signal.emit,
-                        progress_cb=self.signals.progress_signal.emit
+                        progress_cb=item_progress_cb
                     )
                 elif cat == "video_stream" or ext == "m3u8":
-                    ok, path = dl.download_m3u8(url, item_referer, clean_title, log_cb=self.signals.log_signal.emit)
+                    ok, path = dl.download_m3u8(
+                        url, item_referer, clean_title, 
+                        log_cb=self.signals.log_signal.emit,
+                        progress_cb=item_progress_cb
+                    )
                     if ok and path:
                         self.downloaded_video_files.append(path)
                 else:
-                    ok, path = dl.download_file(url, item_referer, clean_title, ext, log_cb=self.signals.log_signal.emit)
+                    ok, path = dl.download_file(
+                        url, item_referer, clean_title, ext, 
+                        log_cb=self.signals.log_signal.emit,
+                        progress_cb=item_progress_cb
+                    )
 
                     if ok and path and cat == "video":
                         self.downloaded_video_files.append(path)
 
-                self.signals.progress_signal.emit(int((idx / total) * 100))
+                self.signals.progress_signal.emit(int((idx / total) * 100), 0.0, 0.0)
 
             self.signals.download_finished.emit(self.downloaded_video_files)
 

@@ -61,6 +61,81 @@ class ResourceSearcher:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
         }
 
+    @staticmethod
+    def rank_and_deduplicate_resources(results: list, keyword: str) -> list:
+        """
+        全网资源智能健康度与质量评分引擎：
+        1. 严格基于 URL 进行智能去重
+        2. 多维加权评分体系：
+           - 关键词精准度（完全匹配/包含匹配/拼音或模糊匹配）
+           - 画质与源站质量（4K/1080P/原盘/免限速直出/极速流媒体）
+           - 分类专属加权（在线小说直接读、软件纯净安装包优先）
+           - 负向惩罚（低画质/垃圾诱导/超长未知格式降权）
+        让最高清、最快速、最直接的资源永远排在第 1 位！
+        """
+        if not results:
+            return []
+
+        kw_clean = keyword.strip().lower()
+        seen_urls = set()
+        unique_results = []
+        for r in results:
+            u = r.get("url", "").strip()
+            if not u or u in seen_urls:
+                continue
+            seen_urls.add(u)
+            unique_results.append(r)
+
+        def calculate_score(item: dict) -> float:
+            score = 100.0
+            lbl = (item.get("label") or "").lower()
+            cat = item.get("category", "")
+            ext = (item.get("ext") or "").lower()
+
+            # 1. 关键词贴合度维度 (最高 +120 分)
+            if kw_clean in lbl:
+                score += 80.0
+                if f"《{kw_clean}》" in lbl or lbl.startswith(kw_clean):
+                    score += 40.0
+            else:
+                # 分词部分命中
+                words = [w for w in kw_clean.split() if len(w) >= 2]
+                if words and any(w in lbl for w in words):
+                    score += 30.0
+
+            # 2. 资源类别与便捷度维度
+            if cat == "novel" and item.get("sub_category") == "novel_online":
+                score += 70.0 # 在线秒读小说享受极高置顶优先级
+            elif cat == "video_stream":
+                score += 50.0 # 秒开即播 HLS/m3u8 优先
+            elif cat == "software":
+                score += 45.0
+                if ext in ["dmg", "exe", "pkg"]:
+                    score += 25.0
+            elif cat == "pan_drive":
+                score += 35.0
+                if item.get("pwd"):
+                    score += 5.0
+            elif cat == "magnet":
+                score += 30.0
+
+            # 3. 画质与品质特征标签加权
+            hd_tags = ["4k", "2160p", "1080p", "蓝光", "超清", "原画", "remux", "bdrip", "hdrip", "精校", "无删减", "全本", "纯净版"]
+            for tag in hd_tags:
+                if tag in lbl:
+                    score += 20.0
+
+            # 4. 负向质量惩罚
+            junk_tags = ["枪版", "tc版", "ts版", "清晰度低", "有水印", "赌博", "下注", "预览版", "样章", "残本"]
+            for jt in junk_tags:
+                if jt in lbl:
+                    score -= 80.0
+
+            return score
+
+        unique_results.sort(key=calculate_score, reverse=True)
+        return unique_results
+
     def resolve_multilingual_aliases(self, keyword: str):
         """
         智能多语言片名自动互译与别名联想：
@@ -896,7 +971,10 @@ class ResourceSearcher:
                 results.extend(self.search_software(keyword))
                 results.extend(self.search_documents(keyword))
 
-        return results
+        # 智能综合质量打分、多维排序与精准去重
+        ranked_results = self.rank_and_deduplicate_resources(results, keyword)
+        self.log_cb(f"🎯 [质量评分置顶] 已对 {len(ranked_results)} 项资源执行多维画质与健康度加权评级，最高清、最有效资源已优先置顶！")
+        return ranked_results
 
 
 

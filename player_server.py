@@ -17,7 +17,50 @@ _PROXY_PORT = 0
 _LOCK = threading.Lock()
 
 
+import re
+
 AD_KEYWORDS = ["/ad/", "ad_", "advert", "guanggao", "tuiguang", "banner", "cpv", "cpm"]
+
+def resolve_direct_m3u8_stream(url: str, referer: str = "") -> str:
+    """
+    智能穿透中转播放页，提取出底层真实纯净的 m3u8 流媒体直链
+    攻克如 https://hn.bfvvs.com/play/xxx 或 https://play.subokk.com/play/xxx 等以网页形式封装的流
+    """
+    url_lower = url.lower()
+    if ".m3u8" in url_lower or ".mp4" in url_lower or ".flv" in url_lower:
+        return url
+
+    # 1. 优先尝试直接追加 /index.m3u8 规范路径（国内各大 CMS 统一播放路由）
+    candidates = [
+        url.rstrip("/") + "/index.m3u8",
+        url.rstrip("/") + ".m3u8"
+    ]
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Referer": referer or url
+    }
+    with httpx.Client(verify=False, timeout=3.0, follow_redirects=True) as client:
+        for cand in candidates:
+            try:
+                r = client.head(cand, headers=headers)
+                if r.status_code == 200:
+                    return cand
+            except Exception:
+                pass
+
+        # 2. 从返回的 HTML 中智能嗅探内嵌真实 m3u8 变量 (如 const vid = '...', url: '...', etc.)
+        try:
+            r = client.get(url, headers=headers)
+            if r.status_code == 200:
+                html = r.text
+                m = re.search(r'[\'"](https?://[^\'"]+\.m3u8[^\'"]*)[\'"]', html)
+                if m:
+                    clean_stream = m.group(1).replace(r'\/', '/')
+                    return clean_stream
+        except Exception:
+            pass
+
+    return url
 
 def clean_m3u8_ad_chunks(m3u8_text: str) -> str:
     """智能过滤 m3u8 中的插播广告与片头广告切片"""
@@ -153,11 +196,14 @@ def ensure_proxy_running() -> int:
 
 
 def get_proxy_stream_url(video_url: str, referer: str = "") -> str:
-    """将任意流媒体链接转化为经过本地防盗链解密的极速播放 URL"""
+    """将任意流媒体链接（包括网页内嵌型流）转化为经过本地防盗链解密与规范化的极速播放 URL"""
     if not video_url.startswith("http://") and not video_url.startswith("https://"):
         return video_url  # 本地文件直接返回
 
+    # 智能穿透提取底层的真实 m3u8 地址
+    real_stream_url = resolve_direct_m3u8_stream(video_url, referer=referer)
+
     port = ensure_proxy_running()
-    encoded_url = urllib.parse.quote(video_url)
+    encoded_url = urllib.parse.quote(real_stream_url)
     encoded_ref = urllib.parse.quote(referer) if referer else ""
     return f"http://127.0.0.1:{port}/proxy?url={encoded_url}&ref={encoded_ref}"

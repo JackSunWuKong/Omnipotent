@@ -271,6 +271,10 @@ class ResourceSearcher:
                                 if not stream_url.startswith("http"):
                                     continue
 
+                                # 针对常见 CMS 播放器页面链接（如 /play/xxxx），直接规范化映射为底层切片直链
+                                if "/play/" in stream_url and not any(stream_url.lower().endswith(e) for e in [".m3u8", ".mp4", ".flv", ".webm"]):
+                                    stream_url = stream_url.rstrip("/") + "/index.m3u8"
+
                                 if stream_url in seen_urls:
                                     continue
                                 seen_urls.add(stream_url)

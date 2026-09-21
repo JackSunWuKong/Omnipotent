@@ -10,8 +10,8 @@ import os
 TRANSLATIONS = {
     "zh_CN": {
         "app_title": "万象探索 (OmniFinder) - 个人网络多媒体与资源探索助手 (学习研究版)",
-        "omni_title": "🔍 OmniFinder 极速探索（全自动智能识别：网页解析 / 影视搜剧 / 协议嗅探）",
-        "omni_placeholder": "💡 随意输入：网页URL（如各类视频站）、影视剧名称、或磁力magnet链接...",
+        "omni_title": "🔍 OmniFinder 全能探索（AI意图理解 · 模糊剧情台词逆向 · 极速流媒体 · 全网穿透）",
+        "omni_placeholder": "💡 随意输入：网页URL、片名/书名、经典台词、剧情描述（如“有些鸟是关不住的”、“卖鱼的黑老大”）...",
         "btn_omni": "⚡ 智能解析 / 极速搜索",
         "chk_force_browser": "强力穿透模式 (遇到特种 Cloudflare/极难防护站时勾选)",
         "chk_deep_dive": "🌊 全网深潜模式 (网盘暗搜+全球磁力+绝版冷门穿透)",

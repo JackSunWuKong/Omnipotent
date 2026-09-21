@@ -6,9 +6,10 @@
 import re
 import httpx
 import urllib.parse
-import concurrent.futures
 from urllib.parse import quote
+import concurrent.futures
 from bs4 import BeautifulSoup
+from semantic_reasoner import semantic_reasoner
 
 # 经过严密验证：即时秒级响应、带标准可直出 m3u8 的 10 大核心片源 API 矩阵池
 VIDEO_SEARCH_APIS = [
@@ -959,6 +960,17 @@ class ResourceSearcher:
         elif category_hint == "video":
             self.log_cb(f"【OmniFinder】已定向进入影视流媒体模式，检索可播放视频源...")
             return self.search_videos(keyword)
+
+        # 0. 智能语义意图与台词/剧情逆向推导引擎（突破传统死板搜索）
+        inferred_entity = None
+        if semantic_reasoner.is_natural_language_query(keyword):
+            self.log_cb(f"🧠 [AI 智能意图推理] 检测到模糊剧情/台词/自然语言描述，正在进行多源知识图谱与全网逆向实体聚类...")
+            inferred_entity = semantic_reasoner.deduce_entity_from_plot_or_quote(keyword)
+            if inferred_entity:
+                self.log_cb(f"🎯 [AI 逆向推导成功] 已锁定标准实体: 《{inferred_entity.title}》 (置信度: {int(inferred_entity.confidence*100)}%)")
+                self.log_cb(f"   💡 推理依据: {inferred_entity.rationale}")
+                # 自动将关键词重定向/增广为确切的标准实体名进行全网击穿
+                keyword = inferred_entity.title
 
         # 智能检测是否输入的是剧情描述
         clue_indicators = ["被困", "迷宫", "杀手", "失忆", "特工", "反杀", "互换", "荒岛", "讲的是", "解说", "小帅"]

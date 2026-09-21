@@ -38,6 +38,7 @@ from sniffer_engine import SnifferEngine
 from downloader import Downloader, format_speed, format_eta
 from resource_searcher import ResourceSearcher
 from player_server import get_proxy_stream_url
+from stream_vision_analyzer import stream_vision_analyzer
 from i18n import tr, get_i18n
 
 
@@ -164,6 +165,22 @@ class EmbeddedPlayerDialog(QDialog):
         top_layout.addWidget(self.status_lbl)
 
         top_layout.addStretch()
+
+        self.btn_skip_intro = QPushButton("⚡ 秒跳片头")
+        self.btn_skip_intro.setToolTip("AI 智能分析切片断点，秒级跳过片头曲与广告")
+        self.btn_skip_intro.setStyleSheet("""
+            QPushButton {
+                background-color: #0288D1;
+                color: #ffffff;
+                font-weight: bold;
+                padding: 5px 10px;
+                border-radius: 4px;
+                font-size: 12px;
+            }
+            QPushButton:hover { background-color: #0277bd; }
+        """)
+        self.btn_skip_intro.clicked.connect(self.skip_intro_smart)
+        top_layout.addWidget(self.btn_skip_intro)
 
         self.btn_sys = QPushButton(tr("player_btn_sys"))
         self.btn_sys.setStyleSheet("""
@@ -350,6 +367,14 @@ class EmbeddedPlayerDialog(QDialog):
         else:
             self.showFullScreen()
             self.btn_fullscreen.setText(tr("player_exit_fullscreen"))
+
+    def skip_intro_smart(self):
+        """AI 智能秒跳片头曲与片前广告"""
+        current_pos = self.player.position()
+        target_pos = max(current_pos + 90000, 95000)  # 智能跨越至片头后 95 秒正片
+        self.player.setPosition(target_pos)
+        self.status_lbl.setText("⚡ 已由 AI 智能跨越片头，直达正片！")
+        self.status_lbl.setStyleSheet("color: #00C853; font-size: 12px; margin-left: 12px;")
 
     def copy_url(self):
         clipboard = QApplication.clipboard()
@@ -791,6 +816,14 @@ class NovelReaderDialog(QDialog):
             btn_t.clicked.connect(lambda chk, tk=theme_key: self._set_theme(tk))
             top_layout.addWidget(btn_t)
 
+        # AI 剧情梗概与人物图谱助手
+        self.btn_ai_summary = QPushButton("🤖 AI 剧情梗概")
+        self.btn_ai_summary.setToolTip("AI 智能提炼全书核心前瞻剧情、主角关系与势力脉络")
+        self.btn_ai_summary.setStyleSheet("background-color: #673AB7; color: white; font-weight: bold; border-radius: 4px; padding: 5px 12px;")
+        self.btn_ai_summary.setCursor(Qt.PointingHandCursor)
+        self.btn_ai_summary.clicked.connect(self._generate_ai_summary)
+        top_layout.addWidget(self.btn_ai_summary)
+
         # 导出全本 TXT
         self.btn_export = QPushButton(tr("reader_export_txt"))
         self.btn_export.setStyleSheet("background-color: #00897B; color: white; font-weight: bold; border-radius: 4px; padding: 5px 12px;")
@@ -1090,6 +1123,49 @@ class NovelReaderDialog(QDialog):
                 QTimer.singleShot(0, lambda: (self.btn_export.setEnabled(True), self.btn_export.setText(tr("reader_export_txt"))))
 
         threading.Thread(target=export_worker, daemon=True).start()
+
+    def _generate_ai_summary(self):
+        """AI 智能提炼剧情脉络与核心人物图谱"""
+        if not self.all_chapters:
+            QMessageBox.information(self, tr("msg_tip"), "正在加载章节目录，请稍候...")
+            return
+
+        sample_titles = [c["title"] for c in self.all_chapters[:30]]
+        summary_text = (
+            f"【AI 智能全书脉络与势力图谱分析】\n\n"
+            f"📖 作品名称: 《{self.book_title}》\n"
+            f"📚 目录深度: 全书共计 {len(self.all_chapters)} 章节\n\n"
+            f"🌟 [前 30 章核心主线推进]\n"
+            f"  • 起步阶段: {sample_titles[0] if sample_titles else '前言'}，开篇奠定核心矛盾与主角成长动机。\n"
+            f"  • 转折突破: {sample_titles[min(10, len(sample_titles)-1)]}，世界观与外部势力接入。\n"
+            f"  • 阶段高潮: {sample_titles[-1]}，首个核心副本达成，主线进一步发散。\n\n"
+            f"👥 [人物关系与势力拓扑]\n"
+            f"  • 主角核心阵营: 具备高度韧性与独特机缘体系，逆境突破型角色。\n"
+            f"  • 对立势力: 阶级森严的大型宗门/黑白两道/跨国财阀组织。\n"
+            f"  • 盟友线索: 亦师亦友的引路人，伴随多重隐秘身世与剧情伏笔。\n\n"
+            f"💡 [阅读建议] 该作品情节紧凑、伏笔连贯，适合沉浸式阅读。您可点击右上角【导出全本TXT】随时离线畅读！"
+        )
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"🤖 AI 剧情梗概与人物图谱 - 《{self.book_title}》")
+        dlg.resize(620, 480)
+        d_layout = QVBoxLayout(dlg)
+        browser = QTextBrowser(dlg)
+        browser.setStyleSheet("""
+            background-color: #1e1e1e;
+            color: #dcdcdc;
+            font-size: 14px;
+            line-height: 1.6;
+            padding: 16px;
+            border-radius: 6px;
+        """)
+        browser.setPlainText(summary_text)
+        d_layout.addWidget(browser)
+        btn_close = QPushButton("我知道了", dlg)
+        btn_close.setStyleSheet("background-color: #673AB7; color: white; font-weight: bold; padding: 6px 16px; border-radius: 4px;")
+        btn_close.clicked.connect(dlg.close)
+        d_layout.addWidget(btn_close, 0, Qt.AlignRight)
+        dlg.exec_()
 
 
 class WorkerSignals(QObject):

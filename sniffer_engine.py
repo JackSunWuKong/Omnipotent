@@ -28,6 +28,7 @@ from bs4 import BeautifulSoup
 from sniffer_magic import identify_resource
 from video_extractor import VideoExtractor
 from vip_parser import parse_vip_video_stream
+from autonomous_agent import autonomous_agent
 
 
 def decode_html_bytes(content: bytes, headers: dict = None) -> str:
@@ -338,6 +339,13 @@ class SnifferEngine:
                 if is_pan_link and "教程" in link_text and not any(k in link_text for k in ["下载", "安装包", "原件"]):
                     continue
                 add_candidate(href, link_text)
+
+        # 10.5 🤖【AI 通用自愈穿透智能体】对网页所有按钮进行视觉与认知打分，自动避开流氓全家桶，萃取真实直链
+        healed_elements = autonomous_agent.self_heal_and_extract(html, target_url)
+        if healed_elements:
+            self.log_cb(f"🤖 [AI 自愈感知] 经人类视觉行为认知打分，成功推演并萃取 {len(healed_elements)} 个高置信度真实下载目标，已绕过所有广告诱导按钮！")
+            for he in healed_elements:
+                add_candidate(he["url"], f"🎯 {he['label']} (AI置信度: {int(he['confidence_score'])})")
 
         # 11. 软件应用聚合门户深度穿透探针（攻克如 MacWk、精选软件站、WordPress 应用导航等深水区）
         # 此类站点首页或列表页仅展示应用卡片，下载直链与网盘提取码藏在内页或通过 Ajax/弹窗动态生成

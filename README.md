@@ -1,15 +1,16 @@
 <div align="center">
 
-# 🌟 OmniFinder (万象探索)
-### 个人多媒体检索与网络协议技术探索工具 (学习研究版)
-### Personal Web & Media Explorer for Research and Study
+# 🌟 OmniFinder (万象探索 / 万能工具箱)
+### 全能桌面协议探针 · 万能智能爬虫嗅探 · 流媒体免广告秒播 · 电子书深度阅读与下载器
+### All-in-One Multi-Tool: Smart Web Crawler, Stream Media Player, E-Book Extractor & Protocol Inspector
 
 [![Python Version](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![GUI Framework](https://img.shields.io/badge/GUI-PyQt5%20%7C%20QtWebEngine-green.svg)](https://www.riverbankcomputing.com/software/pyqt/)
-[![License](https://img.shields.io/badge/License-Academic%20Research%20Only-orange.svg)](#免责声明--legal-disclaimer)
+[![Category](https://img.shields.io/badge/Category-All--in--One%20Utility%20%7C%20万能工具-orange.svg)]()
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-lightgrey.svg)]()
+[![License](https://img.shields.io/badge/License-Academic%20Research%20Only-yellow.svg)](#免责声明--legal-disclaimer)
 
-[简体中文](#-简体中文) | [English Documentation](#-english-documentation)
+[简体中文](#-简体中文) | [English Documentation](#-english-documentation) | [快速开始](#-快速开始) | [特性总览](#-核心特性)
 
 </div>
 
@@ -18,7 +19,12 @@
 # 🇨🇳 简体中文
 
 ## 📖 项目概述
-**OmniFinder (万象探索)** 是一款专为**计算机网络协议分析、流媒体传输解码及多源信息聚合技术**研究而设计的开源桌面探索工具。
+**OmniFinder (万象探索 / 万能工具)** 是一款集**万能智能爬虫嗅探、网络协议逆向穿透、流媒体去广告秒播、小说全本阅读与下载**于一体的全能型开源桌面工具箱（All-in-one Desktop Tool）。
+
+本项目专为计算机网络协议分析、流媒体传输解码及多源信息穿透技术研究而生，彻底解决普通用户在搜索资源、下载软件或观看视频时遭遇的虚假广告、捆绑流氓软件、加密限制和死链痛点。
+
+> [!NOTE]
+> **核心关键词 (Search Keywords)**：万能工具 / 万能工具箱 / 全能助手 / 网络爬虫 / 资源搜索器 / M3U8播放器 / 小说阅读器 / 视频嗅探 / All-in-one tool / Web scraper / Media player / Novel reader / PyQt5 desktop app / Download manager
 
 > [!NOTE]
 > **合规声明**：本项目属于非商业性质的个人学术探索与技术实验项目，旨在研究客户端-服务端协议交互、流媒体切片合并技术与跨语言语义对齐算法。
@@ -125,7 +131,12 @@ python3 main_ui.py
 # 🌐 English Documentation
 
 ## 📖 Overview
-**OmniFinder** is an open-source desktop exploration tool designed for **computer network protocol analysis, media streaming & decoding, and multi-source information retrieval** research.
+**OmniFinder** is an all-in-one desktop multi-tool and exploration utility designed for **network protocol inspection, deep web crawling, ad-free stream media decoding, and offline e-book extraction**.
+
+Whether you are looking for an all-in-one utility to search content across the web, play protected M3U8 streams without ads, or extract and read complete e-books natively, OmniFinder provides a unified and clutter-free desktop workspace.
+
+> [!NOTE]
+> **Keywords for GitHub Discovery**: `all-in-one` · `desktop-tool` · `web-crawler` · `stream-player` · `m3u8-player` · `media-downloader` · `ebook-reader` · `novel-downloader` · `python` · `pyqt5` · `万能工具` · `资源搜索`
 
 > [!NOTE]
 > **Compliance Notice**: This project is strictly non-commercial and developed for personal educational research and technical experiments to analyze client-server interactions, stream segment reassembly, and cross-lingual semantic alignment.

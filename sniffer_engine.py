@@ -219,13 +219,32 @@ class SnifferEngine:
 
         # 2. 静态页面拉取与智能全编码解码
         self.log_cb(f"正在拉取页面底层骨架与多媒体资源: {target_url}")
+        resp = None
+        html = ""
+        soup = None
         try:
             resp = self.client.get(target_url)
             html = decode_html_bytes(resp.content, resp.headers)
             soup = BeautifulSoup(html, "html.parser")
         except Exception as e:
-            self.log_cb(f"[网络提示] 获取页面内容异常: {e}")
-            return results
+            # 容灾自动自愈：许多国内网站根域名 (如 https://999rn.cn) 未绑定 SSL 证书或报 502，
+            # 实际业务均挂载在 www 子域 (如 https://www.999rn.cn)，自动进行 www 容灾自愈尝试！
+            p_obj = urlparse(target_url)
+            host_parts = p_obj.netloc.split(".")
+            if len(host_parts) == 2 and not p_obj.netloc.startswith("www."):
+                alt_url = f"{p_obj.scheme}://www.{p_obj.netloc}{p_obj.path}"
+                self.log_cb(f"⚡ [智能容灾自愈] 根域名连接异常 ({e})，正在自动切换至官方子域: {alt_url} 重试...")
+                try:
+                    resp = self.client.get(alt_url)
+                    target_url = alt_url
+                    html = decode_html_bytes(resp.content, resp.headers)
+                    soup = BeautifulSoup(html, "html.parser")
+                except Exception as e2:
+                    self.log_cb(f"[网络提示] 容灾子域获取依然异常: {e2}")
+                    return results
+            else:
+                self.log_cb(f"[网络提示] 获取页面内容异常: {e}")
+                return results
 
         title = "未知页面"
         if soup.title and soup.title.string:
@@ -545,7 +564,8 @@ class SnifferEngine:
                 context = browser.new_context(
                     user_agent=self.headers["User-Agent"],
                     viewport={"width": 1280, "height": 720},
-                    locale="zh-CN"
+                    locale="zh-CN",
+                    ignore_https_errors=True
                 )
 
                 # 注入 🐒【篡改猴 (Tampermonkey) 级内核原型链 Hook 与虚拟沙箱】

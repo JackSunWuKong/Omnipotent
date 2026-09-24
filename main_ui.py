@@ -1589,12 +1589,16 @@ class MainWindow(QMainWindow):
             target_url = raw_text if is_explicit_url else f"https://{raw_text}"
             self.append_log(tr("log_start_url", url=target_url))
             def run_url_worker():
-                engine = SnifferEngine(log_cb=self.signals.log_signal.emit)
-                if force_cdp:
-                    results = engine.analyze_with_playwright(target_url)
-                else:
-                    results = engine.analyze_auto(target_url)
-                self.signals.scan_finished.emit(results)
+                try:
+                    engine = SnifferEngine(log_cb=self.signals.log_signal.emit)
+                    if force_cdp:
+                        results = engine.analyze_with_playwright(target_url)
+                    else:
+                        results = engine.analyze_auto(target_url)
+                    self.signals.scan_finished.emit(results)
+                except Exception as e:
+                    self.signals.log_signal.emit(f"❌ [分析异常] 嗅探分析遇到不可恢复错误: {e}")
+                    self.signals.scan_finished.emit([])
             threading.Thread(target=run_url_worker, daemon=True).start()
 
         elif is_p2p:

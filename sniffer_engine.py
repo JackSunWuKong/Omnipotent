@@ -442,6 +442,69 @@ class SnifferEngine:
             results = deep_app_results + results
             self.log_cb(f"✓ [软件暗河穿透完成] 成功穿透解密出 {len(deep_app_results)} 款真实软件下载与转存直链并置顶交付！")
 
+        # 11.5 🌐【综合门户与分流跳转池深度穿透探针】（攻克如 kdsou.com / 卡盟导航 / 聚合发卡中转站等深水区）
+        # 此类站点外层为门户宣传页，通过重定向脚本或多级跳转池（如 g8g8.top -> 真实服务分发集群）隐藏核心业务直链
+        gateway_links = []
+        for a in soup.find_all("a", href=True):
+            h_raw = a["href"].strip()
+            if not h_raw or h_raw.startswith("#") or h_raw.startswith("javascript:"):
+                continue
+            h_full = urljoin(target_url, h_raw)
+            link_txt = a.get_text(strip=True) or "门户业务通道"
+            # 识别外链跳转池、子服务网关与业务直通入口
+            if h_full != target_url and not any(h_full.lower().endswith(ext) for ext in [".css", ".js", ".ico", ".png", ".jpg", ".jpeg", ".gif"]):
+                if not any(ign in h_full for ign in ["miit.gov.cn", "beian", "baidu.com", "google.com"]):
+                    if h_full not in [gl[0] for gl in gateway_links]:
+                        gateway_links.append((h_full, link_txt))
+
+        # 若主站为聚合门户且常规媒体/软件为空，自动穿透跳转池提取底层业务节点与资源
+        if gateway_links and not any(r.get("category") in ["software", "pan_drive", "video_stream"] for r in results):
+            self.log_cb(f"🌐 [门户跳转池穿透] 检测到业务分流跳转网关，发现 {len(gateway_links)} 个外链通道，正在深入解密真实服务集群...")
+            portal_results = []
+            for gw_url, gw_label in gateway_links[:5]:
+                try:
+                    gw_r = self.client.get(gw_url, headers={"Referer": target_url}, timeout=6.0)
+                    if gw_r.status_code == 200:
+                        gw_html = gw_r.text
+                        # 嗅探跳转池数组（如 var urls = [...]）
+                        pool_urls = re.findall(r'[\'\"`](https?://[^\'\"`\s]+)[\'\"`]', gw_html)
+                        valid_pool = [
+                            u for u in pool_urls
+                            if any(u.endswith(ext) or ext in u for ext in ['.top/', '.cn/', '.vip/', '.com/', '.html'])
+                            and not any(bad in u.lower() for bad in ['qpic', '.png', '.jpg', '.gif', '.css', '.js', 'beian', 'gov.cn'])
+                        ]
+
+                        # 记录网关入口直链
+                        portal_results.append({
+                            "url": gw_url,
+                            "category": "software",
+                            "ext": "web",
+                            "size": 0,
+                            "label": f"🌐 《{title}》 核心业务直达通道 ({gw_label})",
+                            "source_engine": "门户穿透",
+                            "referer": target_url
+                        })
+
+                        # 如果挖掘出底层集群负载节点，全部解析并直达交付
+                        for node_url in set(valid_pool[:6]):
+                            if node_url not in seen_urls:
+                                seen_urls.add(node_url)
+                                portal_results.append({
+                                    "url": node_url,
+                                    "category": "software",
+                                    "ext": "web",
+                                    "size": 0,
+                                    "label": f"⚡ 《{title}》 业务直连节点",
+                                    "source_engine": "跳转池解密",
+                                    "referer": gw_url
+                                })
+                except Exception:
+                    pass
+
+            if portal_results:
+                results = portal_results + results
+                self.log_cb(f"✓ [门户跳转池穿透完成] 成功解密出 {len(portal_results)} 个底层真实业务直链与集群节点！")
+
         # 12. 终极自适应无缝升级：
         # 如果静态和DOM分析未发现可播放视频流，或者目标为典型的动态单页/SPA站点，自动无缝切换至 CDP 底层网络穿透！
         has_video = any(r.get("category") in ["video", "video_stream"] for r in results)

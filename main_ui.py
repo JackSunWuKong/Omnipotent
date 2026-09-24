@@ -39,6 +39,7 @@ from downloader import Downloader, format_speed, format_eta
 from resource_searcher import ResourceSearcher
 from player_server import get_proxy_stream_url
 from stream_vision_analyzer import stream_vision_analyzer
+from monkey_runtime import monkey_runtime
 from i18n import tr, get_i18n
 
 
@@ -672,6 +673,9 @@ class ResourcePreviewDialog(QDialog):
             });
         })();
         """
+        # 注入 🐒【篡改猴 (Tampermonkey) 原型链 Hook + 广告拦截矩阵】
+        monkey_js = monkey_runtime.get_core_hook_script()
+        self.web_view.page().runJavaScript(monkey_js)
         self.web_view.page().runJavaScript(adblock_js)
 
     def _toggle_view_mode(self):

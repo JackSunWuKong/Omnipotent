@@ -29,6 +29,7 @@ from sniffer_magic import identify_resource
 from video_extractor import VideoExtractor
 from vip_parser import parse_vip_video_stream
 from autonomous_agent import autonomous_agent
+from monkey_runtime import monkey_runtime
 
 
 def decode_html_bytes(content: bytes, headers: dict = None) -> str:
@@ -547,13 +548,11 @@ class SnifferEngine:
                     locale="zh-CN"
                 )
 
-                # 注入 Stealth 防反爬检测脚本（抹除自动化特征）
-                context.add_init_script("""
-                    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-                    window.chrome = { runtime: {} };
-                    Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN', 'zh', 'en'] });
-                    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
-                """)
+                # 注入 🐒【篡改猴 (Tampermonkey) 级内核原型链 Hook 与虚拟沙箱】
+                # 劫持 window.fetch、XMLHttpRequest、HTMLMediaElement 并粉碎 debugger 死循环
+                monkey_hook_code = monkey_runtime.get_core_hook_script()
+                context.add_init_script(monkey_hook_code)
+                self.log_cb("🐒 [篡改猴运行时就绪] 已注入内核级原型链 Hook (fetch/XHR/Media 拦截 + 反反调试脱壳)")
 
                 page = context.new_page()
 
@@ -661,11 +660,12 @@ class SnifferEngine:
                 except Exception:
                     pass
 
-                # 等待 4 秒持续抓取异步分发的流地址
-                for _ in range(4):
-                    if any(r["category"] == "video_stream" for r in results):
-                        break
-                    page.wait_for_timeout(1000)
+                # 从 🐒【篡改猴内存拦截池】中收割所有被 Hook 截获的底层媒体
+                monkey_captured = monkey_runtime.extract_captured_streams_from_page(page)
+                if monkey_captured:
+                    self.log_cb(f"🐒 [篡改猴内存收割] 成功从网页内核中捕获 {len(monkey_captured)} 条深层被劫持的流媒体！")
+                    for mc in monkey_captured:
+                        record_media(mc["url"], f"🐒 原型链劫持流 ({mc.get('source', 'Hook')})", default_cat="video_stream", default_ext="m3u8", is_direct_request=True)
 
                 # 提取页面标题并整理资源友好名称
                 try:

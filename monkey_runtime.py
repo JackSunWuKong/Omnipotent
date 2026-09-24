@@ -169,14 +169,82 @@ class MonkeyScriptRuntime:
                 }
             } catch(e) {}
 
-            // 5. 【篡改猴特权环境模拟】：为网页注入安全的跨域与全局存储支持
+            // 5. 🐱【嗅探猫 (Cat-Catch) 级杀手锏：MediaSource 与 SourceBuffer 内存级劫持】
+            // 彻底攻破 MSE 流、B站/优酷/爱奇艺等无直链、走二进制 ArrayBuffer 切片的终极防护
+            try {
+                if (window.MediaSource && window.MediaSource.prototype) {
+                    const rawAddSourceBuffer = window.MediaSource.prototype.addSourceBuffer;
+                    window.MediaSource.prototype.addSourceBuffer = function(...args) {
+                        const sb = rawAddSourceBuffer.apply(this, args);
+                        const mimeType = args[0] || 'video/mp4';
+                        
+                        try {
+                            const rawAppendBuffer = sb.appendBuffer;
+                            sb.appendBuffer = function(buffer) {
+                                try {
+                                    if (buffer && (buffer.byteLength || buffer.size)) {
+                                        const bufLen = buffer.byteLength || buffer.size || 0;
+                                        if (!window.__CAT_BUFFER_STATS__) {
+                                            window.__CAT_BUFFER_STATS__ = { totalBytes: 0, chunkCount: 0, mimeTypes: [] };
+                                        }
+                                        window.__CAT_BUFFER_STATS__.totalBytes += bufLen;
+                                        window.__CAT_BUFFER_STATS__.chunkCount += 1;
+                                        if (!window.__CAT_BUFFER_STATS__.mimeTypes.includes(mimeType)) {
+                                            window.__CAT_BUFFER_STATS__.mimeTypes.push(mimeType);
+                                        }
+
+                                        // 记录MSE内存二进制流进入拦截池
+                                        if (!window.__MONKEY_STREAM_CACHE__.some(it => it.type === 'mse_source_buffer')) {
+                                            window.__MONKEY_STREAM_CACHE__.push({
+                                                url: 'mse://source_buffer_stream_' + Date.now(),
+                                                type: 'mse_source_buffer',
+                                                source: 'MediaSource.appendBuffer (' + mimeType + ')',
+                                                mimeType: mimeType,
+                                                timestamp: Date.now()
+                                            });
+                                        }
+                                    }
+                                } catch(err) {}
+                                return rawAppendBuffer.apply(this, arguments);
+                            };
+                        } catch(err) {}
+                        return sb;
+                    };
+                }
+            } catch(e) {}
+
+            // 6. 🐱【嗅探猫同款：Iframe 嵌套沙箱穿透器 (Sandbox Stripper)】
+            // 许多网站将播放器放在 sandbox="allow-scripts" 的 iframe 阻止交互或探测，动态移除其沙箱锁
+            try {
+                const stripSandbox = (iframe) => {
+                    try {
+                        if (iframe && iframe.hasAttribute && iframe.hasAttribute('sandbox')) {
+                            iframe.removeAttribute('sandbox');
+                        }
+                    } catch(err) {}
+                };
+                document.querySelectorAll('iframe').forEach(stripSandbox);
+                const observer = new MutationObserver((mutations) => {
+                    for (const m of mutations) {
+                        if (m.type === 'childList') {
+                            m.addedNodes.forEach(node => {
+                                if (node.nodeName === 'IFRAME') stripSandbox(node);
+                                else if (node.querySelectorAll) node.querySelectorAll('iframe').forEach(stripSandbox);
+                            });
+                        }
+                    }
+                });
+                observer.observe(document.documentElement || document.body, { childList: true, subtree: true });
+            } catch(e) {}
+
+            // 7. 【篡改猴特权环境模拟】：为网页注入安全的跨域与全局存储支持
             window.GM_setValue = (k, v) => localStorage.setItem('__MONKEY_' + k, JSON.stringify(v));
             window.GM_getValue = (k, d) => {
                 const val = localStorage.getItem('__MONKEY_' + k);
                 return val ? JSON.parse(val) : d;
             };
 
-            // 6. 抹除自动化检测指纹
+            // 8. 抹除自动化检测指纹
             try {
                 Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
                 window.chrome = { runtime: {} };

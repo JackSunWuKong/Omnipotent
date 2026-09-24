@@ -680,12 +680,14 @@ class SnifferEngine:
                 except Exception:
                     pass
 
-                # 从 🐒【篡改猴内存拦截池】中收割所有被 Hook 截获的底层媒体
+                # 从 🐒【篡改猴原型链池】与 🐱【嗅探猫 MSE 内存流】中收割所有被截获的底层媒体
                 monkey_captured = monkey_runtime.extract_captured_streams_from_page(page)
                 if monkey_captured:
-                    self.log_cb(f"🐒 [篡改猴内存收割] 成功从网页内核中捕获 {len(monkey_captured)} 条深层被劫持的流媒体！")
+                    self.log_cb(f"🐒🐱 [内核级探针收割] 成功从网页内核与内存中捕获 {len(monkey_captured)} 条深层被劫持的流媒体！")
                     for mc in monkey_captured:
-                        record_media(mc["url"], f"🐒 原型链劫持流 ({mc.get('source', 'Hook')})", default_cat="video_stream", default_ext="m3u8", is_direct_request=True)
+                        m_src = mc.get('source', 'Hook')
+                        prefix = "🐱 MSE切片流" if "MediaSource" in m_src else "🐒 原型链劫持流"
+                        record_media(mc["url"], f"{prefix} ({m_src})", default_cat="video_stream", default_ext="m3u8", is_direct_request=True)
 
                 # 提取页面标题并整理资源友好名称
                 try:

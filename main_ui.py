@@ -1569,19 +1569,31 @@ class MainWindow(QMainWindow):
         self.table.setRowCount(0)
 
         # 智能全自动路由决策
-        is_url = raw_text.startswith("http://") or raw_text.startswith("https://")
+        is_explicit_url = raw_text.startswith("http://") or raw_text.startswith("https://")
         is_p2p = any(raw_text.lower().startswith(p) for p in ["magnet:", "ed2k://", "thunder://"])
+
+        # 智能域名识别器：即使用户未输入 http:// 或 https://（例如输入 999rn.cn, kdsou.com, macwk.cn 等）
+        # 自动识别为目标网页 URL，避免被错误误判为影视/小说关键词去搜索一堆毫不相干的东西！
+        domain_pattern = re.compile(
+            r'^(?:https?://)?'
+            r'(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+'
+            r'(?:com|cn|net|org|top|vip|cc|xyz|tv|me|io|info|biz|co|app|live|work|tech|site|club|fun|online|shop|store|ltd|mobi|asia|so|red|pro|ink|pub|ren)'
+            r'(?::\d+)?(?:/.*)?$',
+            re.IGNORECASE
+        )
+        is_bare_domain = bool(domain_pattern.match(raw_text))
 
         force_cdp = self.force_browser_chk.isChecked()
 
-        if is_url:
-            self.append_log(tr("log_start_url", url=raw_text))
+        if is_explicit_url or is_bare_domain:
+            target_url = raw_text if is_explicit_url else f"https://{raw_text}"
+            self.append_log(tr("log_start_url", url=target_url))
             def run_url_worker():
                 engine = SnifferEngine(log_cb=self.signals.log_signal.emit)
                 if force_cdp:
-                    results = engine.analyze_with_playwright(raw_text)
+                    results = engine.analyze_with_playwright(target_url)
                 else:
-                    results = engine.analyze_auto(raw_text)
+                    results = engine.analyze_auto(target_url)
                 self.signals.scan_finished.emit(results)
             threading.Thread(target=run_url_worker, daemon=True).start()
 

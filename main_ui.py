@@ -24,7 +24,7 @@ from PyQt5.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QCheckBox, QTableWidget,
     QTableWidgetItem, QHeaderView, QFileDialog, QTextEdit, QPlainTextEdit,
     QProgressBar, QSplitter, QGroupBox, QMessageBox, QDialog,
-    QTabWidget, QSlider, QStyle, QScrollArea, QStackedWidget, QComboBox,
+    QTabWidget, QSlider, QStyle, QStyleOptionSlider, QScrollArea, QStackedWidget, QComboBox,
     QListWidget, QListWidgetItem, QTextBrowser
 )
 
@@ -132,6 +132,58 @@ class ChineseFriendlyLineEdit(QPlainTextEdit):
         self.setPlainText(str(text) if text else "")
 
 
+class ClickableSlider(QSlider):
+    """
+    智能进度条：
+    1. 点击任意位置瞬移跳转（解决原生 QSlider 点击只移动一个 step 的痛点）
+    2. 拖拽防反弹锁：拖动过程中阻止 QMediaPlayer 的 positionChanged 事件反弹篡改进度条
+    3. 松开瞬间向底核精准 Seek 提交
+    """
+    def __init__(self, orientation=Qt.Horizontal, parent=None):
+        super().__init__(orientation, parent)
+        self.is_dragging = False
+
+    def mousePressEvent(self, ev):
+        if ev.button() == Qt.LeftButton:
+            self.is_dragging = True
+            val = self.pixel_pos_to_val(ev.pos().x())
+            self.setValue(val)
+            ev.accept()
+            # 触发实时跳转尝试
+            self.sliderMoved.emit(val)
+        super().mousePressEvent(ev)
+
+    def mouseMoveEvent(self, ev):
+        if self.is_dragging:
+            val = self.pixel_pos_to_val(ev.pos().x())
+            self.setValue(val)
+            ev.accept()
+            self.sliderMoved.emit(val)
+        super().mouseMoveEvent(ev)
+
+    def mouseReleaseEvent(self, ev):
+        if ev.button() == Qt.LeftButton:
+            self.is_dragging = False
+            val = self.pixel_pos_to_val(ev.pos().x())
+            self.setValue(val)
+            self.sliderReleased.emit()
+            ev.accept()
+        super().mouseReleaseEvent(ev)
+
+    def pixel_pos_to_val(self, x):
+        opt = QStyleOptionSlider()
+        self.initStyleOption(opt)
+        groove = self.style().subControlRect(QStyle.CC_Slider, opt, QStyle.SC_SliderGroove, self)
+        handle = self.style().subControlRect(QStyle.CC_Slider, opt, QStyle.SC_SliderHandle, self)
+        width = groove.width() - handle.width()
+        if width <= 0:
+            return self.minimum()
+        offset = x - groove.x() - handle.width() // 2
+        offset = max(0, min(offset, width))
+        ratio = offset / width
+        return int(self.minimum() + ratio * (self.maximum() - self.minimum()))
+
+
 class EmbeddedPlayerDialog(QDialog):
     """
     原生硬件加速视频播放弹窗（真正集成在软件内部的极速秒播窗口）
@@ -147,6 +199,7 @@ class EmbeddedPlayerDialog(QDialog):
         self.setWindowTitle(tr("player_title", title=title))
         self.resize(1020, 640)
         self.setStyleSheet("background-color: #0d1117; color: #ffffff;")
+        self.setFocusPolicy(Qt.StrongFocus)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -240,15 +293,17 @@ class EmbeddedPlayerDialog(QDialog):
         self.time_lbl.setStyleSheet("color: #8b949e; font-size: 12px; min-width: 95px;")
         ctrl_layout.addWidget(self.time_lbl)
 
-        # 进度滑动条
-        self.slider = QSlider(Qt.Horizontal)
+        # 高精度防反弹即点即跳进度滑动条
+        self.slider = ClickableSlider(Qt.Horizontal)
         self.slider.setRange(0, 0)
+        self.slider.setFocusPolicy(Qt.NoFocus)
         self.slider.setStyleSheet("""
             QSlider::groove:horizontal { height: 6px; background: #30363d; border-radius: 3px; }
             QSlider::sub-page:horizontal { background: #00C853; border-radius: 3px; }
             QSlider::handle:horizontal { background: #ffffff; width: 14px; margin-top: -4px; margin-bottom: -4px; border-radius: 7px; }
         """)
-        self.slider.sliderMoved.connect(self.set_position)
+        self.slider.sliderMoved.connect(self.on_slider_moved)
+        self.slider.sliderReleased.connect(self.on_slider_released)
         ctrl_layout.addWidget(self.slider, 1)
 
         # 音量控制
@@ -260,6 +315,7 @@ class EmbeddedPlayerDialog(QDialog):
         self.vol_slider.setRange(0, 100)
         self.vol_slider.setValue(80)
         self.vol_slider.setFixedWidth(80)
+        self.vol_slider.setFocusPolicy(Qt.NoFocus)
         self.vol_slider.setStyleSheet("""
             QSlider::groove:horizontal { height: 4px; background: #30363d; border-radius: 2px; }
             QSlider::sub-page:horizontal { background: #58a6ff; border-radius: 2px; }
@@ -297,6 +353,66 @@ class EmbeddedPlayerDialog(QDialog):
         self.player.setMedia(media_content)
         self.player.play()
 
+    def keyPressEvent(self, event):
+        """
+        全功能键盘快捷键响应：
+        - 空格键：暂停 / 播放
+        - 方向左键 / 右键：快退 5 秒 / 快进 5 秒 (Shift/Cmd+方向键快进退 30 秒)
+        - 方向上键 / 下键：音量增加 / 减小
+        - F 键：全屏 / 退出全屏
+        - Esc 键：全屏时退出全屏
+        """
+        key = event.key()
+        modifiers = event.modifiers()
+
+        if key == Qt.Key_Space:
+            self.toggle_play()
+            event.accept()
+            return
+        elif key == Qt.Key_Left:
+            step = 30000 if (modifiers & (Qt.ShiftModifier | Qt.ControlModifier | Qt.MetaModifier)) else 5000
+            new_pos = max(0, self.player.position() - step)
+            self.set_position(new_pos)
+            self.status_lbl.setText(f"⏪ 快退 {step // 1000}s")
+            self.status_lbl.setStyleSheet("color: #58a6ff; font-size: 12px; margin-left: 12px;")
+            event.accept()
+            return
+        elif key == Qt.Key_Right:
+            step = 30000 if (modifiers & (Qt.ShiftModifier | Qt.ControlModifier | Qt.MetaModifier)) else 5000
+            new_pos = min(self.player.duration(), self.player.position() + step)
+            self.set_position(new_pos)
+            self.status_lbl.setText(f"⏩ 快进 {step // 1000}s")
+            self.status_lbl.setStyleSheet("color: #58a6ff; font-size: 12px; margin-left: 12px;")
+            event.accept()
+            return
+        elif key == Qt.Key_Up:
+            cur_vol = self.player.volume()
+            new_vol = min(100, cur_vol + 5)
+            self.vol_slider.setValue(new_vol)
+            self.status_lbl.setText(f"🔊 音量: {new_vol}%")
+            self.status_lbl.setStyleSheet("color: #58a6ff; font-size: 12px; margin-left: 12px;")
+            event.accept()
+            return
+        elif key == Qt.Key_Down:
+            cur_vol = self.player.volume()
+            new_vol = max(0, cur_vol - 5)
+            self.vol_slider.setValue(new_vol)
+            self.status_lbl.setText(f"🔉 音量: {new_vol}%")
+            self.status_lbl.setStyleSheet("color: #58a6ff; font-size: 12px; margin-left: 12px;")
+            event.accept()
+            return
+        elif key == Qt.Key_F:
+            self.toggle_fullscreen()
+            event.accept()
+            return
+        elif key == Qt.Key_Escape:
+            if self.isFullScreen():
+                self.toggle_fullscreen()
+                event.accept()
+                return
+
+        super().keyPressEvent(event)
+
     def play_with_system_direct(self):
         open_media_with_system(self.play_url)
 
@@ -313,7 +429,8 @@ class EmbeddedPlayerDialog(QDialog):
             self.btn_play.setText("▶")
 
     def on_position_changed(self, position):
-        if not self.slider.isSliderDown():
+        # 如果用户正在鼠标拖拽滑动条或点击中，严格禁止底层反弹篡改进度条滑块位置
+        if not self.slider.is_dragging and not self.slider.isSliderDown():
             self.slider.setValue(position)
         self.update_time_label(position, self.player.duration())
 
@@ -321,8 +438,17 @@ class EmbeddedPlayerDialog(QDialog):
         self.slider.setRange(0, duration)
         self.update_time_label(self.player.position(), duration)
 
+    def on_slider_moved(self, position):
+        self.update_time_label(position, self.player.duration())
+
+    def on_slider_released(self):
+        target_pos = self.slider.value()
+        self.set_position(target_pos)
+
     def set_position(self, position):
         self.player.setPosition(position)
+        self.slider.setValue(position)
+        self.update_time_label(position, self.player.duration())
 
     def set_volume(self, value):
         self.player.setVolume(value)
@@ -374,7 +500,7 @@ class EmbeddedPlayerDialog(QDialog):
         """AI 智能秒跳片头曲与片前广告"""
         current_pos = self.player.position()
         target_pos = max(current_pos + 90000, 95000)  # 智能跨越至片头后 95 秒正片
-        self.player.setPosition(target_pos)
+        self.set_position(target_pos)
         self.status_lbl.setText("⚡ 已由 AI 智能跨越片头，直达正片！")
         self.status_lbl.setStyleSheet("color: #00C853; font-size: 12px; margin-left: 12px;")
 

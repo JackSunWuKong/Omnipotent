@@ -608,14 +608,20 @@ class SnifferEngine:
                     base_path = clean.split("?")[0]
                     for item in results:
                         if item.get("category") == cat and item["url"].split("?")[0] == base_path:
-                            if len(clean) > len(item["url"]) or is_direct_request:
-                                item["url"] = clean
+                            if any(k in label for k in ["免费公开展播", "付费互动", "门票", "直播间"]):
                                 item["label"] = label
+                            elif len(clean) > len(item["url"]) or is_direct_request:
+                                item["url"] = clean
+                                if not any(k in item.get("label", "") for k in ["免费公开展播", "付费互动", "门票", "直播间"]):
+                                    item["label"] = label
                                 item["referer"] = target_url
-                                return
                             return
 
                     if clean in seen_urls:
+                        if any(k in label for k in ["免费公开展播", "付费互动", "门票", "直播间"]):
+                            for item in results:
+                                if item["url"] == clean or item["url"].split("?")[0] == clean.split("?")[0]:
+                                    item["label"] = label
                         return
 
                     seen_urls.add(clean)
@@ -642,9 +648,65 @@ class SnifferEngine:
                         record_media(u, "M3U8流媒体响应", default_cat="video_stream", default_ext="m3u8", is_direct_request=True)
                     elif "video/" in ct:
                         record_media(u, "视频媒体响应", default_cat="video", default_ext="mp4", is_direct_request=True)
-                    # 挖掘现代 SPA 网站在 JSON API 中返回的隐藏播放地址
+                    # 挖掘现代 SPA 网站在 JSON API 中返回的隐藏播放地址与直播间元数据
                     elif "application/json" in ct or "text/json" in ct:
                         try:
+                            # 1. 深度识别直播与互动房间接口 (如 GetAdultLiveList 或其他直播API)
+                            if "live" in u.lower() or "stream" in u.lower():
+                                try:
+                                    j_obj = json.loads(resp.text())
+                                    live_list = []
+                                    if isinstance(j_obj, dict):
+                                        d_field = j_obj.get("data")
+                                        if isinstance(d_field, dict):
+                                            live_list = d_field.get("info") or d_field.get("list") or []
+                                        elif isinstance(d_field, list):
+                                            live_list = d_field
+                                        elif "info" in j_obj and isinstance(j_obj["info"], list):
+                                            live_list = j_obj["info"]
+
+                                    for room in live_list:
+                                        if isinstance(room, dict):
+                                            r_stream = room.get("streamUrl") or room.get("hlsUrl") or room.get("m3u8")
+                                            r_title = room.get("title") or room.get("roomName") or ""
+                                            r_user = room.get("userName") or room.get("nickname") or room.get("anchor") or "主播"
+                                            r_click = room.get("clickUrl") or room.get("liveURL") or ""
+
+                                            # 智能研判：房间是否包含门票/收费/专属互动模式
+                                            # 特征：标题包含控制/门票/国王/收费/千/送/私密，或无直出 streamUrl
+                                            is_paid_room = False
+                                            paid_feature_words = ["控制", "门票", "菜单", "收费", "四千", "下班", "私密", "打赏", "vip", "币", "送"]
+                                            full_room_desc = f"{r_title} {r_user}".lower()
+                                            if any(w in full_room_desc for w in paid_feature_words):
+                                                is_paid_room = True
+
+                                            # A. 拥有免费直出流媒体地址
+                                            if r_stream and ("http://" in r_stream or "https://" in r_stream):
+                                                clean_title = r_title if (r_title and r_title != "None") else f"{r_user}的直播间"
+                                                if is_paid_room:
+                                                    live_tag = f"🟡 [付费互动/门票流] 《{r_user}》: {clean_title}"
+                                                else:
+                                                    live_tag = f"🟢 [免费公开展播] 《{r_user}》: {clean_title}"
+                                                record_media(r_stream, live_tag, default_cat="video_stream", default_ext="m3u8", is_direct_request=True)
+
+                                            # B. 专属收费门票/需进入房间的交互入口
+                                            elif r_click and is_paid_room:
+                                                clean_title = r_title if (r_title and r_title != "None") else f"{r_user}的专属房间"
+                                                if r_click not in seen_urls:
+                                                    seen_urls.add(r_click)
+                                                    results.append({
+                                                        "url": r_click,
+                                                        "category": "video_stream",
+                                                        "ext": "web",
+                                                        "size": 0,
+                                                        "label": f"🔒 [门票/收费直播间] 《{r_user}》: {clean_title}",
+                                                        "source_engine": "收费直播识别",
+                                                        "referer": target_url
+                                                    })
+                                except Exception:
+                                    pass
+
+                            # 2. 常规 JSON 异步媒体地址提取
                             text = resp.text()
                             if any(ext in text.lower() for ext in [".m3u8", ".mp4"]):
                                 found = re.findall(r'https?:\\?/\\?/[^\s"\'<>]+\.(?:m3u8|mp4)[^\s"\'<>]*', text)
@@ -744,6 +806,9 @@ class SnifferEngine:
                     if page_title:
                         short_title = page_title.split("-")[0].split("_")[0].strip() or page_title
                         for item in results:
+                            curr_lbl = item.get("label", "")
+                            if any(k in curr_lbl for k in ["免费公开展播", "付费互动", "门票", "直播间"]):
+                                continue
                             if item["category"] == "video_stream":
                                 item["label"] = f"《{short_title}》高清流媒体"
                             elif item["category"] == "video":

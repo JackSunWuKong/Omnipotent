@@ -1884,12 +1884,18 @@ class MainWindow(QMainWindow):
             raw_c = item.get("category", "")
             ext_suffix = f" (.{item.get('ext', '')})" if item.get('ext') and raw_c in ['software', 'document'] else ""
             cat_desc = tr(f"cat_{raw_c}") + ext_suffix if f"cat_{raw_c}" in get_i18n().get_all_keys() else tr("cat_other")
+            if "免费公开展播" in clean_name:
+                cat_desc = "📡 实时直播 (免费秒播)"
+            elif "付费互动" in clean_name or "门票流" in clean_name:
+                cat_desc = "🟡 互动直播 (带门票/菜单)"
+            elif "门票/收费直播间" in clean_name:
+                cat_desc = "🔒 收费直播间 (需门票/进入)"
             self.table.setItem(row, 2, QTableWidgetItem(cat_desc))
 
             # 3. 资源大小展示
             size_val = item.get("size", 0)
             is_stream = item["category"] in ["video_stream", "video"]
-            size_display = format_size_str(size_val, is_stream=is_stream)
+            size_display = "实时直播" if ("直播" in cat_desc or "直播间" in clean_name) else format_size_str(size_val, is_stream=is_stream)
             size_item = QTableWidgetItem(size_display)
             size_item.setTextAlignment(Qt.AlignCenter)
             self.table.setItem(row, 3, size_item)
@@ -1903,7 +1909,12 @@ class MainWindow(QMainWindow):
 
             btn_style_base = "font-weight: bold; padding: 4px 8px; border-radius: 3px; min-width: 75px; min-height: 24px;"
 
-            if item["category"] in ["video", "video_stream", "audio"]:
+            if "门票/收费直播间" in clean_name or (item.get("source_engine") == "收费直播识别"):
+                view_room_btn = QPushButton("🔍 进房查看")
+                view_room_btn.setStyleSheet(f"background-color: #E65100; color: white; {btn_style_base}")
+                view_room_btn.clicked.connect(lambda checked, it=item: self.preview_resource_item(it))
+                btn_layout.addWidget(view_room_btn)
+            elif item["category"] in ["video", "video_stream", "audio"]:
                 play_btn = QPushButton(tr("btn_play"))
                 play_btn.setStyleSheet(f"background-color: #00C853; color: white; {btn_style_base}")
                 play_btn.clicked.connect(lambda checked, url=item["url"], t=clean_name, ref=item.get("referer", ""): self.play_item_stream(url, t, ref))

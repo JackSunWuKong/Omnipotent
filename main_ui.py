@@ -9,6 +9,8 @@
 import os
 import sys
 import re
+import csv
+import json
 import subprocess
 import threading
 from urllib.parse import urlparse
@@ -1504,10 +1506,28 @@ class MainWindow(QMainWindow):
         self.table.itemChanged.connect(self.update_summary_stats)
         table_layout.addWidget(self.table)
 
-        # 表格下方实时统计标签
+        # 表格下方实时统计标签与八爪鱼级结构化数据导出工具栏
+        stats_bar_layout = QHBoxLayout()
         self.stats_label = QLabel()
         self.stats_label.setStyleSheet("color: #0366d6; font-weight: bold; padding: 4px;")
-        table_layout.addWidget(self.stats_label)
+        stats_bar_layout.addWidget(self.stats_label)
+        stats_bar_layout.addStretch()
+
+        self.btn_export_data = QPushButton()
+        self.btn_export_data.setStyleSheet("""
+            QPushButton {
+                background-color: #0288D1;
+                color: #ffffff;
+                font-weight: bold;
+                padding: 5px 12px;
+                border-radius: 4px;
+                font-size: 12px;
+            }
+            QPushButton:hover { background-color: #0277bd; }
+        """)
+        self.btn_export_data.clicked.connect(self.export_scraped_data)
+        stats_bar_layout.addWidget(self.btn_export_data)
+        table_layout.addLayout(stats_bar_layout)
 
         splitter.addWidget(self.table_group)
         splitter.setStretchFactor(0, 1)
@@ -1640,6 +1660,7 @@ class MainWindow(QMainWindow):
         self.btn_deselect_all.setText(tr("btn_deselect_all"))
 
         self.table_group.setTitle(tr("table_group"))
+        self.btn_export_data.setText(tr("btn_export_data"))
         self.table.setHorizontalHeaderLabels([
             tr("col_check"),
             tr("col_name"),
@@ -1946,6 +1967,80 @@ class MainWindow(QMainWindow):
 
         size_text = format_size_str(total_bytes, is_stream=False)
         self.stats_label.setText(tr("stats_template", total=total_rows, selected=selected_count, size=size_text))
+
+    def export_scraped_data(self):
+        """🐙【八爪鱼 (Octoparse) 级数据导出中心】：将采集到的结构化数据导出为 Excel (CSV) 或 JSON 格式"""
+        total_rows = self.table.rowCount()
+        if total_rows == 0:
+            QMessageBox.information(self, tr("msg_tip"), tr("msg_export_empty"))
+            return
+
+        export_items = []
+        for row in range(total_rows):
+            chk_item = self.table.item(row, 0)
+            data = chk_item.data(Qt.UserRole) if chk_item else None
+            name_item = self.table.item(row, 1)
+            type_item = self.table.item(row, 2)
+            size_item = self.table.item(row, 3)
+            url_item = self.table.item(row, 5)
+
+            name = name_item.text() if name_item else ""
+            cat_desc = type_item.text() if type_item else ""
+            size_str = size_item.text() if size_item else ""
+            raw_url = url_item.text() if url_item else ""
+            referer = (data or {}).get("referer", "")
+            raw_category = (data or {}).get("category", "")
+            ext = (data or {}).get("ext", "")
+
+            export_items.append({
+                "序号 (Index)": row + 1,
+                "资源名称 (Title)": name,
+                "类型说明 (Category)": cat_desc,
+                "原始分类 (RawCategory)": raw_category,
+                "格式后缀 (Extension)": ext,
+                "资源大小 (Size)": size_str,
+                "资源直链 (URL)": raw_url,
+                "页面来源 (Referer)": referer
+            })
+
+        default_filename = os.path.join(self.save_dir, "scraped_data.csv")
+        file_path, selected_filter = QFileDialog.getSaveFileName(
+            self,
+            tr("btn_export_data"),
+            default_filename,
+            "CSV / Excel 表格 (*.csv);;JSON 数据 (*.json)"
+        )
+
+        if not file_path:
+            return
+
+        try:
+            if file_path.lower().endswith(".json") or "json" in selected_filter.lower():
+                if not file_path.lower().endswith(".json"):
+                    file_path += ".json"
+                with open(file_path, "w", encoding="utf-8") as f:
+                    json.dump(export_items, f, ensure_ascii=False, indent=2)
+            else:
+                if not file_path.lower().endswith(".csv"):
+                    file_path += ".csv"
+                with open(file_path, "w", newline="", encoding="utf-8-sig") as f:
+                    writer = csv.DictWriter(f, fieldnames=[
+                        "序号 (Index)",
+                        "资源名称 (Title)",
+                        "类型说明 (Category)",
+                        "原始分类 (RawCategory)",
+                        "格式后缀 (Extension)",
+                        "资源大小 (Size)",
+                        "资源直链 (URL)",
+                        "页面来源 (Referer)"
+                    ])
+                    writer.writeheader()
+                    writer.writerows(export_items)
+
+            self.show_toast(f"✅ {tr('msg_export_done', path=file_path)}")
+            QMessageBox.information(self, tr("msg_success"), tr("msg_export_done", path=file_path))
+        except Exception as e:
+            QMessageBox.critical(self, tr("msg_tip"), f"导出失败: {e}")
 
     def play_item_stream(self, stream_url: str, title: str, referer: str = ""):
         """用户点击【▶ 立即播放】或双击视频行：0.01秒弹出播放窗口并开启硬件加速"""

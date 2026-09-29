@@ -75,6 +75,9 @@ TRANSLATIONS = {
         
         # 统计栏
         "stats_template": "📊 统计信息: 当前共 {total} 个资源 | 已选择 {selected} 项 | 预估总大小: {size}",
+        "btn_export_data": "📊 导出采集数据 (Excel/CSV/JSON)",
+        "msg_export_empty": "当前没有可导出的采集数据！",
+        "msg_export_done": "🎉 采集数据已成功导出至：\n{path}",
         
         # 底部操作
         "bottom_group": "下载与本地文件整理",
@@ -213,6 +216,9 @@ TRANSLATIONS = {
         
         # Stats
         "stats_template": "📊 Statistics: {total} items found | {selected} selected | Estimated size: {size}",
+        "btn_export_data": "📊 Export Data (Excel/CSV/JSON)",
+        "msg_export_empty": "No scraped data available to export!",
+        "msg_export_done": "🎉 Scraped data successfully exported to:\n{path}",
         
         # Bottom Actions
         "bottom_group": "Download & Output Management",
@@ -351,6 +357,9 @@ TRANSLATIONS = {
         
         # 統計欄
         "stats_template": "📊 統計資訊: 目前共 {total} 個資源 | 已選擇 {selected} 項 | 預估總大小: {size}",
+        "btn_export_data": "📊 匯出採集數據 (Excel/CSV/JSON)",
+        "msg_export_empty": "目前沒有可匯出的採集數據！",
+        "msg_export_done": "🎉 採集數據已成功匯出至：\n{path}",
         
         # 底部操作
         "bottom_group": "下載與本機檔案整理",
@@ -489,6 +498,9 @@ TRANSLATIONS = {
         
         # 統計
         "stats_template": "📊 統計: 合計 {total} 件 | 選択済み {selected} 件 | 推定サイズ: {size}",
+        "btn_export_data": "📊 収集データをエクスポート (Excel/CSV/JSON)",
+        "msg_export_empty": "エクスポート可能な収集データがありません！",
+        "msg_export_done": "🎉 収集データが正常に出力されました:\n{path}",
         
         # 底部
         "bottom_group": "ダウンロード設定とファイル管理",
@@ -627,6 +639,9 @@ TRANSLATIONS = {
         
         # 통계
         "stats_template": "📊 통계: 총 {total} 개 항목 | {selected} 개 선택됨 | 예상 크기: {size}",
+        "btn_export_data": "📊 수집 데이터 내보내기 (Excel/CSV/JSON)",
+        "msg_export_empty": "내보낼 수집 데이터가 없습니다!",
+        "msg_export_done": "🎉 수집 데이터가 성공적으로 내보내졌습니다:\n{path}",
         
         # 하단
         "bottom_group": "다운로드 및 파일 관리",

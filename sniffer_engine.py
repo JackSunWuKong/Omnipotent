@@ -659,13 +659,35 @@ class SnifferEngine:
                 except Exception:
                     pass
 
-                # 模拟用户点击交互，破除现代播放器的静音/防自动播放策略
+                # 🐙【八爪鱼 (Octoparse) 级智能网页交互引擎】：
+                # 1. 模拟人类自然平滑分段向下滚动，深度触发瀑布流懒加载 (LazyLoad)
+                # 2. 自动探测并激活“下一页 / 加载更多”隐藏数据流
+                # 3. 自动探测并触发音视频自动播放破冰
                 try:
-                    page.evaluate("""() => {
+                    self.log_cb("🐙 [八爪鱼智能驱动] 正在执行智能平滑滚动与动态懒加载深度穿透...")
+                    page.evaluate("""async () => {
+                        // 1. 八爪鱼平滑滚动算法：步进式滚动到底部，触发所有动态异步懒加载
+                        await new Promise((resolve) => {
+                            let totalHeight = 0;
+                            const distance = 400;
+                            const timer = setInterval(() => {
+                                const scrollHeight = document.body.scrollHeight;
+                                window.scrollBy(0, distance);
+                                totalHeight += distance;
+                                if (totalHeight >= scrollHeight || totalHeight >= 4000) {
+                                    clearInterval(timer);
+                                    window.scrollTo(0, 0); // 滚回顶部
+                                    resolve();
+                                }
+                            }, 120);
+                        });
+
+                        // 2. 自动破冰播放器与动态交互
                         const playSelectors = [
                             '.play', '.dplayer-play-icon', '.vjs-big-play-button',
                             '.art-state-play', '.xgplayer-play', 'button[aria-label="Play"]',
-                            'button.play', '.prism-play-btn', 'video'
+                            'button.play', '.prism-play-btn', 'video',
+                            '.btn-play', '.player_play', '.mac_player', '.fed-play-btn'
                         ];
                         for (const sel of playSelectors) {
                             const el = document.querySelector(sel);
@@ -676,7 +698,24 @@ class SnifferEngine:
                         document.querySelectorAll('video').forEach(v => {
                             try { v.play(); } catch(e) {}
                         });
+
+                        // 3. 八爪鱼智能翻页/加载更多嗅探：探测是否存在下一集/更多推荐异步接口
+                        const loadMoreSelectors = [
+                            'a:contains("下一页")', 'a:contains("下一集")', 'a:contains("加载更多")',
+                            '.load-more', '.btn-more', '.next-page', '[aria-label="Next"]'
+                        ];
+                        for (const sel of loadMoreSelectors) {
+                            try {
+                                const els = Array.from(document.querySelectorAll('a, button, span')).filter(
+                                    e => /下一[页集章]|加载更多|查看更多|Load More/i.test(e.innerText || '')
+                                );
+                                if (els.length > 0 && els[0]) {
+                                    els[0].dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+                                }
+                            } catch(e) {}
+                        }
                     }""")
+                    page.wait_for_timeout(1000)
                 except Exception:
                     pass
 

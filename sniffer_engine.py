@@ -658,9 +658,16 @@ class SnifferEngine:
 
                 self.log_cb("正在加载目标页面并模拟现代浏览器渲染环境...")
                 try:
-                    page.goto(target_url, wait_until="networkidle", timeout=15000)
+                    # 使用 commit 或 domcontentloaded 策略，避免被极端打点、长轮询或不断建立连接的 SPA 页面导致 15s 发生硬超时
+                    page.goto(target_url, wait_until="domcontentloaded", timeout=12000)
                 except Exception:
-                    pass
+                    try:
+                        page.goto(target_url, wait_until="commit", timeout=8000)
+                    except Exception:
+                        pass
+
+                # 等待现代前端 Angular/React/Vue 框架异步挂载与接口完成
+                page.wait_for_timeout(2500)
 
                 # 🐙【八爪鱼 (Octoparse) 级智能网页交互引擎】：
                 # 1. 模拟人类自然平滑分段向下滚动，深度触发瀑布流懒加载 (LazyLoad)
@@ -741,6 +748,49 @@ class SnifferEngine:
                                 item["label"] = f"《{short_title}》高清流媒体"
                             elif item["category"] == "video":
                                 item["label"] = f"《{short_title}》正片视频"
+                except Exception:
+                    pass
+
+                # 💡【八爪鱼 & SPA 门户级动态影视卡片聚合】：
+                # 如果当前分析的是影视站主页/频道页（页面包含大量影片入口但未自动播放），
+                # 自动提取页面中渲染出的所有影视直达播放通道！
+                try:
+                    video_cards = page.evaluate("""() => {
+                        const links = Array.from(document.querySelectorAll('a'));
+                        const cards = [];
+                        for (const a of links) {
+                            const href = a.href || '';
+                            const text = (a.innerText || '').trim();
+                            if ((href.includes('/play/') || href.includes('/detail/') || href.includes('/video/') || href.includes('/v/')) && text) {
+                                const cleanTitle = text.split('\\n')[0].trim();
+                                if (cleanTitle && cleanTitle.length >= 2 && !cleanTitle.endsWith('万') && !cleanTitle.endsWith('次')) {
+                                    cards.push({ href: href, title: cleanTitle });
+                                }
+                            }
+                        }
+                        return cards;
+                    }""")
+                    if video_cards:
+                        card_added = 0
+                        for vc in video_cards:
+                            v_url = vc.get("href", "")
+                            v_title = vc.get("title", "")
+                            if v_url and v_url not in seen_urls:
+                                seen_urls.add(v_url)
+                                results.append({
+                                    "url": v_url,
+                                    "category": "video_stream",
+                                    "ext": "web",
+                                    "size": 0,
+                                    "label": f"🎬 《{v_title}》 在线播放",
+                                    "source_engine": "SPA动态影视聚合",
+                                    "referer": target_url
+                                })
+                                card_added += 1
+                                if card_added >= 60:
+                                    break
+                        if card_added > 0:
+                            self.log_cb(f"🎬 [SPA动态聚合] 成功在页面中锁定并挂载 {card_added} 部精选影视点播直达入口！")
                 except Exception:
                     pass
 

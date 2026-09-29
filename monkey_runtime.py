@@ -73,17 +73,23 @@ class MonkeyScriptRuntime:
                 }
             }
 
-            // 1. 【反调试死循环粉碎器】：屏蔽网站恶意注入的无限 debugger 假死
+            // 1. 【反调试死循环粉碎器】：屏蔽网站恶意注入的无限 debugger 假死 (安全Proxy模式，不破坏 Angular/Vue 原型链)
             try {
-                const _Function = Function;
-                window.Function = function(...args) {
-                    if (args.length > 0 && typeof args[args.length - 1] === 'string') {
-                        if (args[args.length - 1].includes('debugger')) {
-                            args[args.length - 1] = args[args.length - 1].replace(/debugger/g, '/* debugger bypassed by MonkeyRuntime */');
+                const _rawFunc = window.Function;
+                window.Function = new Proxy(_rawFunc, {
+                    construct(target, args) {
+                        if (args.length > 0 && typeof args[args.length - 1] === 'string' && args[args.length - 1].includes('debugger')) {
+                            args[args.length - 1] = args[args.length - 1].replace(/debugger/g, '/* bypass */');
                         }
+                        return new target(...args);
+                    },
+                    apply(target, thisArg, args) {
+                        if (args.length > 0 && typeof args[args.length - 1] === 'string' && args[args.length - 1].includes('debugger')) {
+                            args[args.length - 1] = args[args.length - 1].replace(/debugger/g, '/* bypass */');
+                        }
+                        return Reflect.apply(target, thisArg, args);
                     }
-                    return _Function.apply(this, args);
-                };
+                });
             } catch(e) {}
 
             // 2. 【XMLHttpRequest 原型链劫持】：深度捕获所有 Ajax 异步请求与响应

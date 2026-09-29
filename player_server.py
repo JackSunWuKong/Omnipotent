@@ -138,15 +138,26 @@ class StreamProxyHandler(http.server.BaseHTTPRequestHandler):
                     # 1. 净化过滤片头及插播广告切片
                     sanitized_text = clean_m3u8_ad_chunks(resp.text)
 
-                    # 2. 针对 m3u8 清单文本，递归重写所有合法 .ts 切片地址为本地代理地址
+                    # 2. 针对 m3u8 清单文本，递归重写所有切片地址及密钥地址为本地代理完整地址
+                    proxy_port = self.server.server_address[1]
+                    proxy_base = f"http://127.0.0.1:{proxy_port}/proxy"
                     base_target = target_url.rsplit("/", 1)[0] + "/"
                     lines = sanitized_text.splitlines()
                     rewritten = []
                     for line in lines:
                         line_s = line.strip()
-                        if line_s and not line_s.startswith("#"):
+                        if line_s.startswith("#EXT-X-KEY:"):
+                            # 重写密钥 URI: URI="..."
+                            def _key_sub(match):
+                                key_uri = match.group(1)
+                                full_key = urllib.parse.urljoin(base_target, key_uri)
+                                proxy_key = f"{proxy_base}?url={urllib.parse.quote(full_key)}&ref={urllib.parse.quote(referer)}"
+                                return f'URI="{proxy_key}"'
+                            line = re.sub(r'URI="([^"]+)"', _key_sub, line)
+                            rewritten.append(line)
+                        elif line_s and not line_s.startswith("#"):
                             full_chunk = urllib.parse.urljoin(base_target, line_s)
-                            proxy_chunk = f"/proxy?url={urllib.parse.quote(full_chunk)}&ref={urllib.parse.quote(referer)}"
+                            proxy_chunk = f"{proxy_base}?url={urllib.parse.quote(full_chunk)}&ref={urllib.parse.quote(referer)}"
                             rewritten.append(proxy_chunk)
                         else:
                             rewritten.append(line)
@@ -155,6 +166,7 @@ class StreamProxyHandler(http.server.BaseHTTPRequestHandler):
                     self.send_response(200)
                     self.send_header("Content-Type", "application/vnd.apple.mpegurl; charset=utf-8")
                     self.send_header("Content-Length", str(len(body_bytes)))
+                    self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
                     self.send_header("Access-Control-Allow-Origin", "*")
                     self.end_headers()
                     self.wfile.write(body_bytes)

@@ -729,7 +729,17 @@ class SnifferEngine:
                         pass
 
                 # 等待现代前端 Angular/React/Vue 框架异步挂载与接口完成
-                page.wait_for_timeout(2500)
+                page.wait_for_timeout(2000)
+
+                # 🚀【自动击穿年龄门禁与合规遮罩】：真实派发物理点击击破 18+ 协议弹窗
+                try:
+                    for sel in ['.btn-visitors-agreement-accept', '.age-gate-accept', 'button[class*="accept"]']:
+                        if page.is_visible(sel, timeout=1000):
+                            page.click(sel)
+                            page.wait_for_timeout(2500)
+                            break
+                except Exception:
+                    pass
 
                 # 🐙【八爪鱼 (Octoparse) 级智能网页交互引擎】：
                 # 1. 模拟人类自然平滑分段向下滚动，深度触发瀑布流懒加载 (LazyLoad)
@@ -738,6 +748,7 @@ class SnifferEngine:
                 try:
                     self.log_cb("🐙 [八爪鱼智能驱动] 正在执行智能平滑滚动与动态懒加载深度穿透...")
                     page.evaluate("""async () => {
+
                         // 1. 八爪鱼平滑滚动算法：步进式滚动到底部，触发所有动态异步懒加载
                         await new Promise((resolve) => {
                             let totalHeight = 0;
@@ -856,6 +867,42 @@ class SnifferEngine:
                                     break
                         if card_added > 0:
                             self.log_cb(f"🎬 [SPA动态聚合] 成功在页面中锁定并挂载 {card_added} 部精选影视点播直达入口！")
+
+                    # 发现直播互动房间入口（如 yelive.tv / stripchat 类单路径主播主页 /username）
+                    try:
+                        raw_anchors = page.eval_on_selector_all('a[href]', 'els => els.map(e => [e.href, (e.innerText || "").trim(), e.getAttribute("title") || ""])')
+                        p_origin = f"{urlparse(target_url).scheme}://{urlparse(target_url).netloc}"
+                        excluded_subs = {
+                            'about', 'signup', 'login', 'terms', 'privacy', '2257', 'support',
+                            'report', 'parental-control', 'dmca', 'cookies-policy', 'men', 'trans',
+                            'favorites', 'discover', 'watch-history', 'couples', 'tags', 'strips'
+                        }
+                        m_added = 0
+                        seen_models = set()
+                        for h, inner, tit in raw_anchors:
+                            if h.startswith(p_origin + '/'):
+                                sub = h[len(p_origin) + 1:].split('?')[0].split('#')[0]
+                                if sub and '/' not in sub and sub.lower() not in excluded_subs:
+                                    if h not in seen_urls and sub not in seen_models:
+                                        seen_urls.add(h)
+                                        seen_models.add(sub)
+                                        display_name = (inner or tit).split('\n')[0].strip() or sub
+                                        results.append({
+                                            "url": h,
+                                            "category": "video_stream",
+                                            "ext": "web",
+                                            "size": 0,
+                                            "label": f"📡 [在线直播间] 《{display_name}》 实时互动",
+                                            "source_engine": "实时直播平台嗅探",
+                                            "referer": target_url
+                                        })
+                                        m_added += 1
+                                        if m_added >= 40:
+                                            break
+                        if m_added > 0:
+                            self.log_cb(f"📡 [直播聚合发现] 成功截获并挂载 {m_added} 个正在开播的主播专属房间！")
+                    except Exception:
+                        pass
                 except Exception:
                     pass
 
